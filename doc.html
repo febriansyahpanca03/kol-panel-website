@@ -49,11 +49,11 @@
 </head>
 <body>
 <div class="topbar">
-  <a href="/">🎯 KOL Panel</a>
+  <a href="index.html">🎯 KOL Panel</a>
   <span class="sep">/</span>
-  <a href="/setup-guide.html">Setup Guide</a>
-  <a href="/config-generator.html">Config Generator</a>
-  <a href="/deployment-dashboard.html">Status</a>
+  <a href="setup-guide.html">Setup Guide</a>
+  <a href="config-generator.html">Config Generator</a>
+  <a href="deployment-dashboard.html">Status</a>
 </div>
 <main id="content">Memuat…</main>
 
@@ -76,11 +76,11 @@
 
   if (!file) {
     el.innerHTML = '<div class="err"><strong>Dokumen tidak ditemukan.</strong>' +
-      '<p><a href="/">Kembali ke beranda</a></p></div>';
+      '<p><a href="index.html">Kembali ke beranda</a></p></div>';
     return;
   }
 
-  fetch('/md/' + file)
+  fetch("md/" + file)
     .then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
@@ -92,7 +92,7 @@
     })
     .catch(function (e) {
       el.innerHTML = '<div class="err"><strong>Gagal memuat ' + file + '</strong>' +
-        '<p>' + e.message + '</p><p><a href="/">Kembali ke beranda</a></p></div>';
+        '<p>' + e.message + '</p><p><a href="index.html">Kembali ke beranda</a></p></div>';
     });
 })();
 </script>
