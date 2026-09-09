@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KOL Panel — Setup Guide</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      background: #fafafa;
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+    h1 { font-size: 28px; margin: 0 0 8px; }
+    .subtitle { color: #6b7280; font-size: 14px; margin-bottom: 32px; }
+    .step-section {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .step-number {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      background: #111827;
+      color: #fff;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 40px;
+      font-weight: 600;
+      margin-right: 12px;
+      vertical-align: middle;
+    }
+    .step-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+    }
+    .step-content {
+      margin-left: 52px;
+    }
+    .step-content > * { margin: 12px 0; }
+    .step-content > *:first-child { margin-top: 0; }
+    code {
+      background: #f3f4f6;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: "Monaco", "Menlo", monospace;
+      font-size: 12px;
+    }
+    .code-block {
+      background: #f3f4f6;
+      padding: 12px;
+      border-radius: 6px;
+      overflow-x: auto;
+      border-left: 3px solid #111827;
+      font-family: "Monaco", "Menlo", monospace;
+      font-size: 12px;
+      margin: 12px 0;
+    }
+    .tip {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 12px 0;
+    }
+    .success {
+      background: #d1fae5;
+      border-left: 4px solid #10b981;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 12px 0;
+    }
+    .warning {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+      padding: 12px;
+      border-radius: 4px;
+      margin: 12px 0;
+    }
+    a {
+      color: #0ea5e9;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
+    ol, ul {
+      margin: 12px 0;
+      padding-left: 20px;
+    }
+    li {
+      margin: 8px 0;
+    }
+    .checkpoint {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 12px 0;
+    }
+    .status-done { color: #10b981; font-weight: 600; }
+    .status-todo { color: #f59e0b; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>🚀 KOL Panel — Setup Guide</h1>
+  <div class="subtitle">Panduan lengkap menyiapkan extension, Google Sheets, dan Apps Script</div>
+
+  <!-- Step 1 -->
+  <div class="step-section">
+    <div class="step-title">
+      <span class="step-number">1</span>
+      Load Extension di Chrome
+      <span class="status-done" style="margin-left: auto; font-size: 12px;">✓ SUDAH JADI</span>
+    </div>
+    <div class="step-content">
+      <p><strong>Status:</strong> Extension sudah diload di <code>chrome://extensions</code>.</p>
+      <p><strong>Verifikasi:</strong></p>
+      <ul>
+        <li>Buka <code>chrome://extensions</code></li>
+        <li>Cari "KOL Panel" dalam daftar</li>
+        <li>Pastikan toggle <strong>ON</strong> (biru)</li>
+      </ul>
+      <div class="success">✓ Jika melihat icon KOL Panel di kanan address bar, lanjut ke Step 2.</div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="step-section">
+    <div class="step-title">
+      <span class="step-number">2</span>
+      Setup Google Sheets & Apps Script
+      <span class="status-todo" style="margin-left: auto; font-size: 12px;">→ MULAI DI SINI</span>
+    </div>
+    <div class="step-content">
+      <p><strong>Tujuan:</strong> Buat spreadsheet baru dan deploy Apps Script sebagai Web App.</p>
+
+      <h4>2a. Buat Spreadsheet Baru</h4>
+      <ol>
+        <li>Buka <a href="https://sheets.new" target="_blank">sheets.new</a> — ini akan membuat spreadsheet kosong</li>
+        <li>Beri nama: "KOL Panel" (atau apa saja yang kamu suka)</li>
+      </ol>
+
+      <h4>2b. Setup Apps Script</h4>
+      <ol>
+        <li>Di spreadsheet yang baru, klik <strong>Extensions → Apps Script</strong></li>
+        <li>Akan terbuka tab baru ke editor Apps Script</li>
+        <li>Hapus file <code>Code.gs</code> yang bawaan (select semua, delete)</li>
+        <li>Buat file baru untuk setiap file di folder <code>apps-script/</code> repo:
+          <ul>
+            <li><code>Config.gs</code></li>
+            <li><code>Logic.gs</code></li>
+            <li><code>Code.gs</code></li>
+            <li><code>SheetSetup.gs</code></li>
+          </ul>
+        </li>
+        <li>Untuk setiap file:
+          <ul>
+            <li>Klik <strong>+ (plus icon)</strong> → <strong>File</strong></li>
+            <li>Beri nama file (tanpa <code>.gs</code>)</li>
+            <li>Copy-paste isi file dari repo ke editor</li>
+            <li>Tekan <strong>Ctrl+S</strong> untuk simpan</li>
+          </ul>
+        </li>
+        <li>Setelah semua 4 file ada, kembali ke spreadsheet dan <strong>refresh halaman</strong> (F5)</li>
+      </ol>
+
+      <div class="tip">
+        💡 <strong>Tip:</strong> Jangan copy-paste error — verifikasi setiap file punya baris pertama yang benar.
+      </div>
+
+      <h4>2c. Jalankan Setup Sheets</h4>
+      <ol>
+        <li>Di spreadsheet, tunggu ~5 detik sampai menu baru muncul</li>
+        <li>Klik <strong>KOL Panel → Setup Sheets</strong></li>
+        <li>Akan muncul dialog. Klik <strong>OK</strong> atau <strong>Continue</strong></li>
+        <li>Tunggu sebentar... spreadsheet akan otomatis membuat 6 sheet baru:</li>
+        <li style="color: #6b7280; font-size: 13px; margin-top: 8px;">
+          KOL, Post, Campaign, Kalender, Dashboard, Config
+        </li>
+      </ol>
+
+      <div class="success">✓ Jika melihat 6 sheet baru di tab bawah, lanjut ke 2d.</div>
+
+      <h4>2d. Deploy sebagai Web App</h4>
+      <ol>
+        <li>Di editor Apps Script, klik <strong>Deploy → New deployment</strong></li>
+        <li>Pilih tipe: <strong>Web app</strong></li>
+        <li>Isi:
+          <ul>
+            <li><strong>Execute as:</strong> Pilih email kamu (biasanya sudah terpilih)</li>
+            <li><strong>Who has access:</strong> Pilih <strong>Anyone</strong></li>
+          </ul>
+        </li>
+        <li>Klik <strong>Deploy</strong></li>
+        <li>Akan muncul URL panjang. <strong>Copy URL itu dan simpan di tempat aman</strong></li>
+      </ol>
+
+      <div class="success">✓ URL Web App sudah di tangan. Lanjut ke Step 3.</div>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step-section">
+    <div class="step-title">
+      <span class="step-number">3</span>
+      Ambil Token dari Sheets
+    </div>
+    <div class="step-content">
+      <p><strong>Tujuan:</strong> Copy token otomatis yang sudah digenerate Apps Script.</p>
+
+      <ol>
+        <li>Di spreadsheet, buka sheet <strong>Config</strong> (tab paling kanan)</li>
+        <li>Kamu akan lihat dua kolom: <strong>Key</strong> dan <strong>Value</strong></li>
+        <li>Cari baris dengan <strong>Key = "Token"</strong></li>
+        <li>Di kolom <strong>Value</strong>, ada string panjang yang acak — <strong>copy itu</strong></li>
+      </ol>
+
+      <div class="success">✓ Token sudah dicopy. Sekarang kamu punya:
+        <ul>
+          <li>✓ Web App URL</li>
+          <li>✓ Token</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step-section">
+    <div class="step-title">
+      <span class="step-number">4</span>
+      Configure Extension Settings
+    </div>
+    <div class="step-content">
+      <p><strong>Tujuan:</strong> Beri tahu extension di mana Web App-nya dan token apa yang dipakai.</p>
+
+      <ol>
+        <li>Di browser, cari icon <strong>KOL Panel</strong> (di kanan address bar)</li>
+        <li>Klik icon → akan muncul popup kecil</li>
+        <li>Klik <strong>⚙️ Options</strong> atau <strong>Pengaturan</strong> (sesuai browser language)</li>
+        <li>Halaman pengaturan terbuka. Isi form dengan:</li>
+        <li style="margin-top: 12px;">
+          <strong>Web App URL:</strong> Paste URL dari Step 2d<br>
+          <strong>Token:</strong> Paste token dari Step 3
+        </li>
+        <li style="margin-top: 12px;">Klik tombol <strong>Tes koneksi</strong></li>
+      </ol>
+
+      <div class="checkpoint">
+        <strong>🔍 Cek koneksi:</strong>
+        <ul>
+          <li><strong style="color: #10b981;">Hijau "Koneksi berhasil"</strong> → Lanjut ke Step 5 ✓</li>
+          <li><strong style="color: #ef4444;">Merah "Koneksi gagal"</strong> → Verifikasi URL dan Token (lihat troubleshooting di bawah)</li>
+        </ul>
+      </div>
+
+      <p style="margin-top: 16px;">Klik <strong>Simpan pengaturan</strong> untuk selesai.</p>
+    </div>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step-section">
+    <div class="step-title">
+      <span class="step-number">5</span>
+      Test di Browser
+    </div>
+    <div class="step-content">
+      <p><strong>Tujuan:</strong> Verifikasi semuanya jalan dengan navigasi ke profil asli.</p>
+
+      <ol>
+        <li>Buka salah satu situs (pilih satu):
+          <ul>
+            <li><a href="https://www.tiktok.com/@nasa" target="_blank">TikTok: @nasa</a></li>
+            <li><a href="https://www.instagram.com/nasa/" target="_blank">Instagram: @nasa</a></li>
+            <li><a href="https://www.threads.net/@zuck" target="_blank">Threads: @zuck</a></li>
+          </ul>
+        </li>
+        <li>Tunggu halaman fully load (biarkan selama 3-5 detik)</li>
+        <li>Lihat di <strong>kanan atas halaman</strong> — ada panel <strong>"KOL Panel"</strong> dengan:
+          <ul>
+            <li>Nama akun + follower count</li>
+            <li>ER (Engagement Rate)</li>
+            <li>Posting rhythm</li>
+            <li>Tombol <strong>"Kirim ke Sheets"</strong></li>
+          </ul>
+        </li>
+      </ol>
+
+      <div class="success">✓ Panel muncul = extension berfungsi!</div>
+
+      <h4>5b. Kirim Data ke Sheets</h4>
+      <ol>
+        <li>Klik tombol <strong>"Kirim ke Sheets"</strong> di panel</li>
+        <li>Tunggu konfirmasi (seharusnya hijau "Tersimpan")</li>
+        <li>Buka spreadsheet KOL Panel → sheet <strong>KOL</strong></li>
+        <li>Seharusnya ada baris baru dengan data profil (nama, followers, ER, dll)</li>
+      </ol>
+
+      <div class="success">✓ Data muncul di Sheets = semuanya berhasil! 🎉</div>
+    </div>
+  </div>
+
+  <!-- Troubleshooting -->
+  <div class="step-section">
+    <h3>🔧 Troubleshooting</h3>
+
+    <h4>❌ Panel tidak muncul di halaman profil</h4>
+    <ul>
+      <li><strong>Cek 1:</strong> Refresh halaman (F5)</li>
+      <li><strong>Cek 2:</strong> Chrome > Extensions > KOL Panel toggle ON?</li>
+      <li><strong>Cek 3:</strong> Cek Console (F12 > Console tab) untuk error merah</li>
+    </ul>
+
+    <h4>❌ "Koneksi gagal" saat tes koneksi</h4>
+    <ul>
+      <li><strong>Penyebab 1:</strong> URL salah. Paste ulang dari Step 2d (harus cocok persis)</li>
+      <li><strong>Penyebab 2:</strong> Token salah. Paste ulang dari Step 3</li>
+      <li><strong>Penyebab 3:</strong> Apps Script belum di-deploy sebagai Web App. Ulangi Step 2d</li>
+    </ul>
+
+    <h4>❌ "Sheet ... tidak ditemukan"</h4>
+    <ul>
+      <li><strong>Solusi:</strong> Jalankan <strong>KOL Panel > Setup Sheets</strong> lagi</li>
+    </ul>
+
+    <h4>❌ Panel muncul tapi data tidak loading ("belum ada post")</h4>
+    <ul>
+      <li>Normal jika profil punya sedikit post (perlu ≥2 post untuk menghitung statistics)</li>
+      <li>Coba profil lain yang punya lebih banyak post</li>
+    </ul>
+  </div>
+
+  <!-- Summary -->
+  <div class="step-section" style="background: #f0fdf4; border-color: #86efac;">
+    <h3 style="color: #166534; margin-top: 0;">✨ Setup Selesai</h3>
+    <p>Sekarang kamu bisa:</p>
+    <ul>
+      <li>Buka profil TikTok/Instagram/Threads</li>
+      <li>Lihat followers, ER, posting rhythm, price gate</li>
+      <li>Klik "Kirim ke Sheets" untuk simpan data</li>
+      <li>Lihat Dashboard di Sheets untuk analytics</li>
+    </ul>
+    <p style="margin-top: 16px; color: #166534;">
+      <strong>Butuh bantuan?</strong> Lihat <code>apps-script/README.md</code> untuk detail lebih lanjut.
+    </p>
+  </div>
+</body>
+</html>

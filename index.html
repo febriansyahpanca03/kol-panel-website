@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOL Panel — Dokumentasi</title>
+<meta name="description" content="Dokumentasi dan panduan setup KOL Panel — ekstensi Chrome untuk mengumpulkan metrik KOL dari Instagram, TikTok, dan Threads.">
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#ffffff; --fg:#1f2328; --muted:#59636e;
+    --border:#d1d9e0; --accent:#0969da; --hero-a:#4f46e5; --hero-b:#7c3aed;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --muted:#9198a1;
+      --border:#3d444d; --accent:#4493f8; --hero-a:#3730a3; --hero-b:#5b21b6;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.6}
+  .hero{background:linear-gradient(135deg,var(--hero-a),var(--hero-b));
+    color:#fff;padding:64px 20px 72px;text-align:center}
+  .hero h1{margin:0 0 12px;font-size:clamp(30px,6vw,46px);letter-spacing:-.02em}
+  .hero p{margin:0 auto;max-width:620px;font-size:clamp(15px,2.4vw,18px);opacity:.92}
+  .badges{margin-top:24px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .badge{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);
+    padding:5px 12px;border-radius:999px;font-size:13px;font-weight:600}
+  main{max-width:1040px;margin:0 auto;padding:48px 20px 80px}
+  h2{font-size:20px;margin:0 0 6px}
+  .lead{color:var(--muted);margin:0 0 22px;font-size:14px}
+  section{margin-bottom:48px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:22px;text-decoration:none;color:inherit;display:block;
+    transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--accent);
+    box-shadow:0 10px 26px rgba(0,0,0,.10)}
+  .card .ico{font-size:26px;line-height:1;display:block;margin-bottom:12px}
+  .card h3{margin:0 0 6px;font-size:16px}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .tag{display:inline-block;margin-top:12px;background:var(--bg);border:1px solid var(--border);
+    color:var(--muted);padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;
+    letter-spacing:.03em;text-transform:uppercase}
+  .steps{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
+  .steps ol{margin:0;padding-left:22px}
+  .steps li{margin:10px 0}
+  .steps code{background:var(--bg);border:1px solid var(--border);padding:.15em .45em;
+    border-radius:5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.86em}
+  footer{border-top:1px solid var(--border);padding:28px 20px;text-align:center;
+    color:var(--muted);font-size:13px}
+  footer a{color:var(--accent);text-decoration:none}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🎯 KOL Panel</h1>
+  <p>Ekstensi Chrome untuk mengumpulkan metrik KOL dari Instagram, TikTok, dan Threads — langsung ke Google Sheets.</p>
+  <div class="badges">
+    <span class="badge">247 tes lulus</span>
+    <span class="badge">Chrome MV3</span>
+    <span class="badge">Setup ±30 menit</span>
+  </div>
+</div>
+
+<main>
+
+  <section>
+    <h2>Mulai di sini</h2>
+    <p class="lead">Tiga hal yang dibutuhkan untuk menjalankan KOL Panel.</p>
+    <div class="grid">
+      <a class="card" href="/setup-guide.html">
+        <span class="ico">📖</span>
+        <h3>Panduan Setup</h3>
+        <p>Langkah 1–5: bikin Google Sheet, deploy Apps Script, sambungkan ekstensi.</p>
+        <span class="tag">Mulai dari sini</span>
+      </a>
+      <a class="card" href="/config-generator.html">
+        <span class="ico">🔧</span>
+        <h3>Config Generator</h3>
+        <p>Tempel Web App URL dan Token, dapatkan setelan siap salin untuk ekstensi.</p>
+        <span class="tag">Alat bantu</span>
+      </a>
+      <a class="card" href="/doc.html?p=setup-checklist">
+        <span class="ico">✅</span>
+        <h3>Checklist Setup</h3>
+        <p>Daftar centang untuk melacak progres di tiap tahap.</p>
+        <span class="tag">Bisa dicetak</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Verifikasi &amp; pengujian</h2>
+    <p class="lead">Pastikan semuanya berjalan sebagaimana mestinya.</p>
+    <div class="grid">
+      <a class="card" href="/deployment-dashboard.html">
+        <span class="ico">📊</span>
+        <h3>Status Deployment</h3>
+        <p>Ringkasan status proyek, alur kerja, dan checklist pra-rilis.</p>
+        <span class="tag">Dasbor</span>
+      </a>
+      <a class="card" href="/doc.html?p=health-check">
+        <span class="ico">🧪</span>
+        <h3>Health Check Browser</h3>
+        <p>Skrip console untuk memastikan ekstensi aktif di halaman profil.</p>
+        <span class="tag">Diagnostik</span>
+      </a>
+      <a class="card" href="/doc.html?p=next-steps">
+        <span class="ico">➡️</span>
+        <h3>Langkah Berikutnya</h3>
+        <p>Yang perlu dikerjakan setelah setup dasar selesai.</p>
+        <span class="tag">Panduan</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Menangkap data asli</h2>
+    <p class="lead">Fixture parser saat ini masih sintetis. Capture asli dibutuhkan untuk verifikasi.</p>
+    <div class="grid">
+      <a class="card" href="/doc.html?p=capture-data">
+        <span class="ico">👤</span>
+        <h3>Panduan Capture (Umum)</h3>
+        <p>Cara merekam respons API dari DevTools — tanpa perlu latar belakang teknis.</p>
+        <span class="tag">Untuk semua orang</span>
+      </a>
+      <a class="card" href="/doc.html?p=fixture-capture">
+        <span class="ico">🛠️</span>
+        <h3>Panduan Capture (Teknis)</h3>
+        <p>Alur anonimisasi, penambahan fixture, dan test case baru.</p>
+        <span class="tag">Untuk developer</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Referensi</h2>
+    <p class="lead">Arsitektur, keputusan desain, dan daftar tugas pra-rilis.</p>
+    <div class="grid">
+      <a class="card" href="/doc.html?p=project-status">
+        <span class="ico">📋</span>
+        <h3>Ringkasan Proyek</h3>
+        <p>Status lengkap tiap tahap, cakupan tes, dan prinsip desain.</p>
+        <span class="tag">Ikhtisar</span>
+      </a>
+      <a class="card" href="/doc.html?p=spec">
+        <span class="ico">📐</span>
+        <h3>Spesifikasi</h3>
+        <p>Sembilan tahap, pemetaan field, dan alasan di balik arsitekturnya.</p>
+        <span class="tag">Arsitektur</span>
+      </a>
+      <a class="card" href="/doc.html?p=todo">
+        <span class="ico">🔍</span>
+        <h3>Checklist Pra-Rilis</h3>
+        <p>Audit keamanan, verifikasi parser, dan QA manual yang belum selesai.</p>
+        <span class="tag">Belum selesai</span>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Ringkas: alur setup</h2>
+    <div class="steps">
+      <ol>
+        <li>Buat Google Sheet baru lewat <code>sheets.new</code>.</li>
+        <li>Salin empat berkas Apps Script (<code>Code.gs</code>, <code>Logic.gs</code>, <code>Config.gs</code>, <code>SheetSetup.gs</code>), lalu jalankan <strong>KOL Panel → Setup Sheets</strong>.</li>
+        <li>Deploy sebagai <strong>Web App</strong> dengan akses <em>Anyone</em>, simpan URL-nya.</li>
+        <li>Ambil token dari sheet <strong>Config</strong>.</li>
+        <li>Tempel URL + token di halaman Options ekstensi, klik <strong>Tes koneksi</strong>.</li>
+        <li>Buka profil TikTok/Instagram/Threads — panel muncul, klik <strong>Kirim ke Sheets</strong>.</li>
+      </ol>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  KOL Panel · <a href="https://github.com/febriansyahpanca03/kol-panel-website">GitHub</a>
+</footer>
+
+</body>
+</html>

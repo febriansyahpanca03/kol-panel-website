@@ -1,0 +1,16 @@
+# Environment variables (contains sensitive token)
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (if needed later)
+node_modules/
+.npm

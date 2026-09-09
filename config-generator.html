@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KOL Panel — Configuration Helper</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 24px 20px;
+      background: linear-gradient(135deg, #f0f4f8 0%, #fafafa 100%);
+      color: #1a1a1a;
+      line-height: 1.6;
+    }
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      padding: 32px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.07);
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      color: #111827;
+    }
+    .subtitle {
+      color: #6b7280;
+      font-size: 14px;
+      margin-bottom: 28px;
+    }
+    .section {
+      margin-bottom: 28px;
+    }
+    .section h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 16px;
+      color: #111827;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      color: #374151;
+    }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-family: "Monaco", "Menlo", monospace;
+      font-size: 13px;
+      background: #f9fafb;
+    }
+    input[type="text"]:focus, textarea:focus {
+      outline: none;
+      border-color: #0ea5e9;
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+    }
+    textarea {
+      min-height: 100px;
+      resize: vertical;
+      font-size: 12px;
+    }
+    .hint {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 12px 24px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #0ea5e9;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #0284c7;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 6px rgba(14, 165, 233, 0.3);
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+    .output-section {
+      background: #f0fdf4;
+      border: 2px solid #a7f3d0;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 20px;
+      display: none;
+    }
+    .output-section.show {
+      display: block;
+    }
+    .output-section h3 {
+      margin: 0 0 16px;
+      color: #065f46;
+      font-size: 16px;
+    }
+    .output-block {
+      background: #fff;
+      border: 1px solid #86efac;
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #047857;
+      overflow: auto;
+      word-break: break-all;
+    }
+    .copy-btn {
+      padding: 6px 12px;
+      font-size: 12px;
+      background: #10b981;
+      color: #fff;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    .copy-btn:hover {
+      background: #059669;
+    }
+    .copy-btn.copied {
+      background: #8b5cf6;
+    }
+    .alert {
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .alert-info {
+      background: #eff6ff;
+      border-left: 4px solid #0ea5e9;
+      color: #0c4a6e;
+    }
+    .alert-warning {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      color: #854d0e;
+    }
+    .step-number {
+      display: inline-block;
+      width: 28px;
+      height: 28px;
+      background: #0ea5e9;
+      color: #fff;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: 600;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    .steps {
+      background: #f9fafb;
+      border-left: 3px solid #0ea5e9;
+      padding: 16px;
+      border-radius: 6px;
+      margin-top: 12px;
+    }
+    .steps ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .steps li {
+      margin: 8px 0;
+      font-size: 13px;
+      color: #374151;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔧 KOL Panel — Configuration Helper</h1>
+    <p class="subtitle">Paste your Web App URL and Token here, then copy settings to extension.</p>
+
+    <div class="alert alert-info">
+      <strong>Before using this:</strong> You should have completed SETUP_GUIDE.html Steps 1-3 (create Sheets, deploy Apps Script, get token).
+    </div>
+
+    <!-- Input Section -->
+    <div class="section">
+      <h2>📋 Your Settings</h2>
+
+      <div class="form-group">
+        <label for="webAppUrl">Web App URL</label>
+        <textarea id="webAppUrl" placeholder="Paste your Web App URL here&#10;Example: https://script.google.com/macros/d/[DEPLOYMENT_ID]/userweb"></textarea>
+        <div class="hint">
+          Found in Apps Script → Deploy → [deployment ID].userweb URL
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="token">Token</label>
+        <textarea id="token" placeholder="Paste your Token here&#10;Example: a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"></textarea>
+        <div class="hint">
+          Found in Sheets → Config sheet → Token row → Value column
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="button-group">
+      <button class="btn-primary" onclick="generateOutput()">📋 Generate Settings</button>
+      <button class="btn-secondary" onclick="clearForm()">🗑️ Clear</button>
+    </div>
+
+    <!-- Output Section -->
+    <div id="outputSection" class="output-section">
+      <h3>✓ Settings Ready to Use</h3>
+
+      <div class="alert alert-warning">
+        <strong>Next Step:</strong> Open KOL Panel extension settings and enter these values:
+      </div>
+
+      <div class="form-group">
+        <label>Web App URL (Copy & Paste)</label>
+        <div class="output-block" id="outputUrl"></div>
+        <button class="copy-btn" onclick="copyToClipboard('outputUrl')">📋 Copy</button>
+      </div>
+
+      <div class="form-group">
+        <label>Token (Copy & Paste)</label>
+        <div class="output-block" id="outputToken"></div>
+        <button class="copy-btn" onclick="copyToClipboard('outputToken')">📋 Copy</button>
+      </div>
+
+      <div class="steps">
+        <strong style="display: block; margin-bottom: 12px;">How to paste into extension:</strong>
+        <ol>
+          <li>Click <strong>KOL Panel icon</strong> in address bar</li>
+          <li>Click <strong>⚙️ Options</strong></li>
+          <li>Paste Web App URL into first field</li>
+          <li>Paste Token into second field</li>
+          <li>Click <strong>Test Connection</strong></li>
+          <li>Should show green "Connection successful" ✓</li>
+        </ol>
+      </div>
+
+      <div class="form-group" style="margin-top: 20px;">
+        <label>Troubleshooting</label>
+        <div class="steps">
+          <strong style="display: block; margin-bottom: 8px;">If "Connection failed":</strong>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li>Verify Web App URL is correct (copy from Apps Script URL bar)</li>
+            <li>Verify Token has no extra spaces or characters</li>
+            <li>Check that Apps Script is deployed (should have deployment ID in URL)</li>
+            <li>Verify "Who has access" is set to "Anyone" in Web App settings</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function generateOutput() {
+      const url = document.getElementById('webAppUrl').value.trim();
+      const token = document.getElementById('token').value.trim();
+
+      if (!url || !token) {
+        alert('Please paste both Web App URL and Token');
+        return;
+      }
+
+      // Validate URL format
+      if (!url.includes('script.google.com')) {
+        alert('⚠️ Web App URL should start with https://script.google.com/...');
+        return;
+      }
+
+      // Display output
+      document.getElementById('outputUrl').textContent = url;
+      document.getElementById('outputToken').textContent = token;
+      document.getElementById('outputSection').classList.add('show');
+
+      // Scroll to output
+      setTimeout(() => {
+        document.getElementById('outputSection').scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      const text = element.textContent;
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(err => {
+        alert('Failed to copy. Please copy manually: ' + text);
+      });
+    }
+
+    function clearForm() {
+      document.getElementById('webAppUrl').value = '';
+      document.getElementById('token').value = '';
+      document.getElementById('outputSection').classList.remove('show');
+    }
+
+    // Allow Enter to generate
+    document.getElementById('webAppUrl').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey) generateOutput();
+    });
+    document.getElementById('token').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.ctrlKey) generateOutput();
+    });
+
+    // Optional: Load from URL parameters (for advanced usage)
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('url')) document.getElementById('webAppUrl').value = decodeURIComponent(params.get('url'));
+    if (params.has('token')) document.getElementById('token').value = decodeURIComponent(params.get('token'));
+  </script>
+</body>
+</html>

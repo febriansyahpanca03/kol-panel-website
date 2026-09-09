@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOL Panel — Docs</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
+    --code-bg:#f6f8fa; --accent:#0969da; --topbar:#0d1117;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+      --code-bg:#161b22; --accent:#4493f8; --topbar:#010409;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.65;font-size:16px}
+  .topbar{background:var(--topbar);padding:14px 20px;position:sticky;top:0;z-index:10;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .topbar a{color:#e6edf3;text-decoration:none;font-weight:600;font-size:14px}
+  .topbar a:hover{text-decoration:underline}
+  .topbar .sep{color:#59636e}
+  main{max-width:860px;margin:0 auto;padding:32px 20px 80px}
+  h1,h2,h3,h4{line-height:1.3;margin-top:1.8em;margin-bottom:.6em;font-weight:650}
+  h1{font-size:2em;border-bottom:1px solid var(--border);padding-bottom:.3em;margin-top:0}
+  h2{font-size:1.45em;border-bottom:1px solid var(--border);padding-bottom:.3em}
+  h3{font-size:1.18em}
+  a{color:var(--accent)}
+  code{background:var(--code-bg);padding:.2em .4em;border-radius:6px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.87em}
+  pre{background:var(--code-bg);padding:16px;border-radius:8px;overflow-x:auto;
+    border:1px solid var(--border)}
+  pre code{background:none;padding:0;font-size:.85em;line-height:1.5}
+  blockquote{border-left:4px solid var(--border);margin:1em 0;padding:0 1em;color:var(--muted)}
+  table{border-collapse:collapse;width:100%;display:block;overflow-x:auto;margin:1em 0}
+  th,td{border:1px solid var(--border);padding:8px 13px;text-align:left}
+  th{background:var(--code-bg);font-weight:650}
+  img{max-width:100%}
+  hr{border:none;border-top:1px solid var(--border);margin:2em 0}
+  ul,ol{padding-left:1.6em}
+  li{margin:.3em 0}
+  input[type=checkbox]{margin-right:.4em}
+  .err{color:#d1242f;padding:20px;border:1px solid #d1242f;border-radius:8px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <a href="/">🎯 KOL Panel</a>
+  <span class="sep">/</span>
+  <a href="/setup-guide.html">Setup Guide</a>
+  <a href="/config-generator.html">Config Generator</a>
+  <a href="/deployment-dashboard.html">Status</a>
+</div>
+<main id="content">Memuat…</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/14.1.3/marked.min.js"></script>
+<script>
+(function () {
+  var ALLOWED = {
+    'setup-checklist': 'SETUP_CHECKLIST.md',
+    'capture-data': 'CAPTURE_REAL_DATA.md',
+    'fixture-capture': 'FIXTURE_CAPTURE_GUIDE.md',
+    'project-status': 'PROJECT_STATUS_SUMMARY.md',
+    'next-steps': 'NEXT_STEPS.md',
+    'spec': 'SPEC.md',
+    'todo': 'TODO.md',
+    'health-check': 'BROWSER_CONSOLE_TEST.md'
+  };
+  var el = document.getElementById('content');
+  var key = new URLSearchParams(location.search).get('p');
+  var file = ALLOWED[key];
+
+  if (!file) {
+    el.innerHTML = '<div class="err"><strong>Dokumen tidak ditemukan.</strong>' +
+      '<p><a href="/">Kembali ke beranda</a></p></div>';
+    return;
+  }
+
+  fetch('/md/' + file)
+    .then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    })
+    .then(function (text) {
+      el.innerHTML = marked.parse(text);
+      var h1 = el.querySelector('h1');
+      document.title = (h1 ? h1.textContent.trim() : file) + ' — KOL Panel';
+    })
+    .catch(function (e) {
+      el.innerHTML = '<div class="err"><strong>Gagal memuat ' + file + '</strong>' +
+        '<p>' + e.message + '</p><p><a href="/">Kembali ke beranda</a></p></div>';
+    });
+})();
+</script>
+</body>
+</html>
