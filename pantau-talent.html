@@ -919,6 +919,7 @@
                             <th>Berakhir</th>
                             <th>Kuota</th>
                             <th>Nilai (IDR)</th>
+                            <th>Surat Kontrak</th>
                         </tr>
                     </thead>
                     <tbody id="dataTableBody">
@@ -1706,9 +1707,6 @@
                 btn.addEventListener('click', () => openRecordUploadModal(btn.dataset.quickRecordFromCard));
             });
 
-            document.querySelectorAll('[data-contract-pdf]').forEach(btn => {
-                btn.addEventListener('click', () => generateContractPDF(btn.dataset.contractPdf));
-            });
         }
 
         function renderQuotaBoxes(total, filled) {
@@ -1743,6 +1741,7 @@
                     <td>${talent.endDate}</td>
                     <td>${talent.quota}</td>
                     <td>${formatCurrency(talent.value)}</td>
+                    <td><button type="button" class="button button-small button-primary" data-contract-pdf="${talent.id}">📄 Buat PDF</button></td>
                 </tr>
             `).join('');
         }
@@ -2266,6 +2265,16 @@
         // ============================================================================
 
         document.getElementById('addTalentBtn').addEventListener('click', () => openTalentModal());
+
+        // Satu pendengar untuk semua tombol surat, di kartu talent maupun di
+        // tabel Data Kontrak, tanpa perlu dipasang ulang tiap render.
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-contract-pdf]');
+            if (btn) {
+                e.preventDefault();
+                generateContractPDF(btn.dataset.contractPdf);
+            }
+        });
 
         // ============================================================================
         // SETTINGS AUTO-SAVE
