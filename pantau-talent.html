@@ -1013,9 +1013,9 @@
                         <div class="setting-description">Muncul di baris "Media Publikasi" pada Pasal 1</div>
                     </div>
                     <div class="field">
-                        <div class="field-label">Persentase DP (%)</div>
+                        <div class="field-label">Persentase DP bawaan (%)</div>
                         <input type="number" id="dpPercent" min="0" max="100" value="30">
-                        <div class="setting-description">Sisanya otomatis jadi pelunasan</div>
+                        <div class="setting-description">Dipakai hanya bila talent tidak punya DP sendiri. Sisanya otomatis jadi pelunasan</div>
                     </div>
                 </div>
             </div>
@@ -1113,6 +1113,14 @@
                         <div class="field-label">Tanggal Surat</div>
                         <input type="date" id="talentContractDate">
                         <div class="setting-description">Kosongkan agar memakai tanggal mulai kontrak</div>
+                    </div>
+                </div>
+
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Persentase DP (%)</div>
+                        <input type="number" id="talentDpPercent" min="0" max="100" placeholder="ikut setelan umum">
+                        <div class="setting-description">Khusus kontrak ini. Kosongkan agar mengikuti setelan umum</div>
                     </div>
                 </div>
 
@@ -1338,6 +1346,16 @@
 
             return remaining <= state.setelan.lowQuotaVideos ||
                    percentRemaining <= state.setelan.lowQuotaPercent;
+        }
+
+        // DP yang berlaku untuk satu talent: nilai miliknya sendiri bila diisi,
+        // kalau tidak jatuh ke setelan umum. Nol dihormati sebagai "tanpa DP".
+        function effectiveDp(talent) {
+            const own = talent.dpPercent;
+            if (own === '' || own === undefined || own === null || isNaN(parseInt(own, 10))) {
+                return state.setelan.dpPercent || 0;
+            }
+            return parseInt(own, 10);
         }
 
         function getUploadDaysArray(talent) {
@@ -1575,6 +1593,8 @@
                 const uploads = getUploadCountForTalent(talent.id);
                 const daysLeft = daysUntil(talent.endDate);
                 const behind = getBehindCount(talent.id);
+                const dpNow = effectiveDp(talent);
+                const dpOwn = !(talent.dpPercent === '' || talent.dpPercent === undefined || talent.dpPercent === null);
 
                 let statusClass = '';
                 if (daysLeft < 0) statusClass = 'overdue';
@@ -1639,6 +1659,10 @@
                                 <div class="field">
                                     <div class="field-label">Tertinggal</div>
                                     <div class="field-value">${behind} video dari target</div>
+                                </div>
+                                <div class="field">
+                                    <div class="field-label">DP</div>
+                                    <div class="field-value">${dpNow}% &middot; ${formatCurrency(Math.round(talent.value * dpNow / 100))}${dpOwn ? '' : ' <span class="text-muted">(setelan umum)</span>'}</div>
                                 </div>
                             </div>
 
@@ -1795,6 +1819,7 @@
                     document.getElementById('talentBank').value = talent.bank || '';
                     document.getElementById('talentScheduleText').value = talent.scheduleText || '';
                     document.getElementById('talentContractDate').value = talent.contractDate || '';
+                    document.getElementById('talentDpPercent').value = talent.dpPercent === undefined || talent.dpPercent === null ? '' : talent.dpPercent;
                     form.dataset.talentId = talentId;
                 }
             } else {
@@ -1812,6 +1837,13 @@
             e.preventDefault();
 
             const talentId = document.getElementById('talentForm').dataset.talentId;
+
+            // Kosong = ikut setelan umum. Nol adalah nilai sah (kontrak tanpa DP),
+            // jadi tidak boleh diperlakukan sama dengan kosong.
+            const dpRaw = document.getElementById('talentDpPercent').value.trim();
+            const dpNum = parseInt(dpRaw, 10);
+            const dpValue = dpRaw === '' || isNaN(dpNum) ? '' : Math.max(0, Math.min(100, dpNum));
+
             const talentData = {
                 id: talentId || 'talent-' + Date.now(),
                 name: document.getElementById('talentName').value,
@@ -1827,7 +1859,8 @@
                 address: document.getElementById('talentAddress').value.trim(),
                 bank: document.getElementById('talentBank').value.trim(),
                 scheduleText: document.getElementById('talentScheduleText').value.trim(),
-                contractDate: document.getElementById('talentContractDate').value
+                contractDate: document.getElementById('talentContractDate').value,
+                dpPercent: dpValue
             };
 
             if (talentId) {
@@ -2128,7 +2161,7 @@
             const quota = talent.quota || 0;
             const total = talent.value || 0;
             const perVideo = quota > 0 ? Math.round(total / quota) : 0;
-            const dpPct = s.dpPercent || 0;
+            const dpPct = effectiveDp(talent);
             const restPct = 100 - dpPct;
             const dpAmount = Math.round(total * dpPct / 100);
             const restAmount = total - dpAmount;
