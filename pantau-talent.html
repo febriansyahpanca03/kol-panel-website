@@ -1063,6 +1063,7 @@
             <div style="margin-bottom: var(--spacing-lg); display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
                 <button class="button button-primary" id="exportBtn">⬇ Unduh Cadangan</button>
                 <button class="button button-secondary" id="importBtn">⬆ Pulihkan Cadangan</button>
+                <button class="button button-success" id="syncNotionBtn">↻ Tarik Riwayat dari Notion</button>
             </div>
             <div class="table-wrapper">
                 <table id="dataTable">
@@ -1274,6 +1275,11 @@
                 </div>
 
                 <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Nama di Notion</div>
+                        <input type="text" id="talentNotionName" placeholder="kosongkan bila sama dengan akun">
+                        <div class="setting-description">Dipakai saat menarik riwayat dari Content Calendar</div>
+                    </div>
                     <div class="field">
                         <div class="field-label">Persentase DP (%)</div>
                         <input type="number" id="talentDpPercent" min="0" max="100" placeholder="ikut setelan umum">
@@ -2002,6 +2008,7 @@
                     document.getElementById('talentScheduleText').value = talent.scheduleText || '';
                     document.getElementById('talentContractDate').value = talent.contractDate || '';
                     document.getElementById('talentDpPercent').value = talent.dpPercent === undefined || talent.dpPercent === null ? '' : talent.dpPercent;
+                    document.getElementById('talentNotionName').value = talent.notionName || '';
                     form.dataset.talentId = talentId;
                 }
             } else {
@@ -2042,7 +2049,8 @@
                 bank: document.getElementById('talentBank').value.trim(),
                 scheduleText: document.getElementById('talentScheduleText').value.trim(),
                 contractDate: document.getElementById('talentContractDate').value,
-                dpPercent: dpValue
+                dpPercent: dpValue,
+                notionName: document.getElementById('talentNotionName').value.trim()
             };
 
             if (talentId) {
@@ -2595,6 +2603,95 @@
             doc.setProperties({ title: `Surat Kontrak ${talentFullName}` });
             doc.save(`Surat Kontrak - ${safe(talentFullName)} - ${safe(talent.account)}.pdf`);
         }
+
+        // ============================================================================
+        // TARIK RIWAYAT DARI NOTION
+        // ============================================================================
+
+        const SYNC_KEY_STORE = 'pantau-talent-sync-key';
+
+        // Hanya menambah riwayat yang belum tercatat. Tidak pernah menghapus,
+        // dan catatan yang sudah Anda sahkan sendiri tidak disentuh.
+        function terapkanRiwayatNotion(baris) {
+            const hari = todayIso();
+            const laporan = [];
+            let tambah = 0;
+
+            state.talents.forEach(t => {
+                const kunci = String(t.notionName || t.account || '').trim().toLowerCase();
+                if (!kunci) return;
+
+                let baru = 0;
+                baris.forEach(b => {
+                    if (String(b.nama).trim().toLowerCase() !== kunci) return;
+                    if (b.tgl < t.startDate || b.tgl > t.endDate || b.tgl > hari) return;
+                    if (uploadOn(t.id, b.tgl)) return;
+                    state.uploads.push({
+                        id: 'upload-notion-' + t.id + '-' + b.tgl,
+                        talentId: t.id, date: b.tgl,
+                        title: 'Dari Notion Content Calendar', link: ''
+                    });
+                    baru++; tambah++;
+                });
+                if (baru) laporan.push('  ' + t.account + ': +' + baru);
+            });
+
+            if (tambah) { saveData(); render(); }
+
+            const namaTalent = state.talents.map(t => String(t.notionName || t.account || '').trim().toLowerCase());
+            const asing = [];
+            baris.forEach(b => {
+                const n = String(b.nama).trim();
+                if (namaTalent.indexOf(n.toLowerCase()) === -1 && asing.indexOf(n) === -1) asing.push(n);
+            });
+
+            alert(
+                (tambah ? tambah + ' riwayat baru ditambahkan:\n' + laporan.join('\n')
+                        : 'Tidak ada riwayat baru. Semua sudah tercatat.') +
+                (asing.length ? '\n\nNama di Notion yang belum punya talent di sini:\n  ' +
+                    asing.slice(0, 15).join(', ') : '')
+            );
+        }
+
+        async function tarikDariNotion() {
+            let sandi = localStorage.getItem(SYNC_KEY_STORE) || '';
+            if (!sandi) {
+                sandi = window.prompt('Masukkan frasa sandi sinkronisasi Notion:') || '';
+                if (!sandi) return;
+            }
+
+            const tombol = document.getElementById('syncNotionBtn');
+            const semula = tombol.textContent;
+            tombol.disabled = true;
+            tombol.textContent = 'Menarik data...';
+
+            try {
+                const r = await fetch('api/notion', { headers: { 'x-sync-key': sandi } });
+                const data = await r.json().catch(() => ({}));
+
+                if (r.status === 401) {
+                    localStorage.removeItem(SYNC_KEY_STORE);
+                    alert('Frasa sandi salah. Klik lagi untuk mencoba ulang.');
+                    return;
+                }
+                if (!r.ok) {
+                    alert('Gagal menarik data.\n\n' + (data.error || ('HTTP ' + r.status)) +
+                          (data.detail ? '\n\n' + data.detail : ''));
+                    return;
+                }
+
+                localStorage.setItem(SYNC_KEY_STORE, sandi);
+                terapkanRiwayatNotion(data.baris || []);
+            } catch (e) {
+                alert('Tidak bisa menghubungi server.\n\nPastikan halaman dibuka lewat alamat webnya, bukan berkas lokal, dan Anda tersambung internet.\n\n' + (e.message || e));
+            } finally {
+                tombol.disabled = false;
+                tombol.textContent = semula;
+            }
+        }
+
+        document.getElementById('syncNotionBtn').addEventListener('click', tarikDariNotion);
+
 
         // ============================================================================
         // TAB NAVIGATION
