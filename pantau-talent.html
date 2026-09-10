@@ -1329,6 +1329,43 @@
         </div>
     </div>
 
+    <!-- Detail satu tanggal di kalender. Sengaja ada: sebelumnya satu klik
+         pada chip langsung mengesahkan tayang atau menghapus catatan, jadi
+         salah klik bisa menghilangkan riwayat tanpa sempat dilihat dulu. -->
+    <div id="calDetailModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Tutup">&times;</button>
+            <div class="modal-title">Detail Jadwal</div>
+            <div class="field">
+                <div class="field-label">Talent</div>
+                <div class="field-value" id="calDetailTalent"></div>
+            </div>
+            <div class="card-row">
+                <div class="field">
+                    <div class="field-label">Tanggal</div>
+                    <div class="field-value" id="calDetailDate"></div>
+                </div>
+                <div class="field">
+                    <div class="field-label">Status</div>
+                    <div class="field-value" id="calDetailStatus"></div>
+                </div>
+            </div>
+            <div class="field" id="calDetailTitleWrap" style="display:none">
+                <div class="field-label">Judul / Keterangan</div>
+                <div class="field-value" id="calDetailTitle"></div>
+            </div>
+            <div class="field" id="calDetailLinkWrap" style="display:none">
+                <div class="field-label">Tautan</div>
+                <div class="field-value" id="calDetailLink"></div>
+            </div>
+            <div class="button-group">
+                <button type="button" class="button button-primary" id="calDetailConfirmBtn">Sahkan tayang</button>
+                <button type="button" class="button button-secondary" id="calDetailUndoBtn">Batalkan konfirmasi</button>
+                <button type="button" class="button button-secondary" id="calDetailCloseBtn">Tutup</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Hidden input untuk import file -->
     <input type="file" id="importFile" accept=".json" style="display: none;">
     <input type="file" id="csvNotionFile" accept=".csv,text/csv" style="display: none;">
@@ -1544,8 +1581,7 @@
         }
 
         function hasUploadToday(talentId) {
-            const today = new Date();
-            const todayStr = today.toISOString().split('T')[0];
+            const todayStr = todayIso();
 
             return state.uploads.some(u => u.talentId === talentId && u.date === todayStr);
         }
@@ -1945,7 +1981,7 @@
             const url = URL.createObjectURL(dataBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `pantau-talent-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.download = `pantau-talent-backup-${todayIso()}.json`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2017,7 +2053,7 @@
                 title.textContent = 'Tambah Talent';
                 delete form.dataset.talentId;
                 // Set today's date as default start date
-                const today = new Date().toISOString().split('T')[0];
+                const today = todayIso();
                 document.getElementById('talentStartDate').value = today;
             }
 
@@ -2083,7 +2119,7 @@
             document.getElementById('recordUploadTalentName').textContent = talent.name;
 
             // Set today as default date
-            const today = new Date().toISOString().split('T')[0];
+            const today = todayIso();
             document.getElementById('recordUploadDate').value = today;
             document.getElementById('recordUploadTitle').value = '';
             document.getElementById('recordUploadLink').value = '';
@@ -2154,8 +2190,13 @@
             return t.toISOString().slice(0, 10);
         }
 
+        // "Hari ini" dipatok ke Asia/Jakarta, bukan zona waktu mesin. Sebelumnya
+        // beberapa tempat memakai toISOString() langsung, yang berarti UTC:
+        // antara 00:00-07:00 WIB dashboard menunjuk tanggal kemarin, sehingga
+        // talent yang sudah upload pagi itu tetap terbaca belum upload.
         function todayIso() {
-            return isoOf(new Date());
+            const wib = new Date(Date.now() + 7 * 3600000);
+            return wib.toISOString().slice(0, 10);
         }
 
         // Jadwal upload diturunkan dari kontrak, tidak disimpan. Bila hari upload
@@ -2254,12 +2295,12 @@
                 html += '<div class="cal-cell' + (iso === hari ? ' today' : '') + '">';
                 html += '<div class="cal-date">' + tgl + '</div>';
                 items.forEach(it => {
-                    const ket = it.status === 'done' ? 'sudah tayang, klik untuk batalkan'
-                        : it.status === 'pending' ? 'jadwal terlewat, klik untuk sahkan tayang'
-                        : 'jadwal mendatang, klik bila sudah tayang lebih awal';
+                    const ket = it.status === 'done' ? 'sudah tayang'
+                        : it.status === 'pending' ? 'jadwal terlewat'
+                        : 'jadwal mendatang';
                     html += '<button type="button" class="cal-chip ' + it.status +
                         '" data-cal-talent="' + it.t.id + '" data-cal-date="' + iso +
-                        '" title="' + it.t.account + ' - ' + ket + '">' + it.t.account + '</button>';
+                        '" title="' + it.t.account + ' - ' + ket + ', klik untuk lihat detail">' + it.t.account + '</button>';
                 });
                 html += '</div>';
             }
@@ -2267,33 +2308,98 @@
             container.innerHTML = html + '</div></div>';
         }
 
-        // Satu klik pada chip kalender: sahkan tayang, atau batalkan.
+        // Klik pada chip kalender membuka detail. Tindakan yang mengubah data
+        // ada di dalam modal, masing-masing dengan tombolnya sendiri, supaya
+        // salah klik pada kalender tidak lagi bisa menghapus riwayat.
+        let calDetailKonteks = null;
+
+        function tutupCalDetail() {
+            document.getElementById('calDetailModal').classList.remove('active');
+            calDetailKonteks = null;
+        }
+
+        function bukaCalDetail(talentId, tanggal) {
+            const talent = state.talents.find(t => t.id === talentId);
+            if (!talent) return;
+
+            const ada = uploadOn(talentId, tanggal);
+            calDetailKonteks = { talentId, tanggal, uploadId: ada ? ada.id : null };
+
+            const status = ada ? 'Sudah tayang'
+                : tanggal < todayIso() ? 'Jadwal terlewat, belum ada catatan'
+                : tanggal === todayIso() ? 'Dijadwalkan hari ini'
+                : 'Jadwal mendatang';
+
+            document.getElementById('calDetailTalent').textContent =
+                (talent.name || '') + (talent.account ? ' (' + talent.account + ')' : '');
+            document.getElementById('calDetailDate').textContent = tanggal;
+            document.getElementById('calDetailStatus').textContent = status;
+
+            const judulWrap = document.getElementById('calDetailTitleWrap');
+            judulWrap.style.display = ada && ada.title ? '' : 'none';
+            document.getElementById('calDetailTitle').textContent = ada ? (ada.title || '') : '';
+
+            const tautanWrap = document.getElementById('calDetailLinkWrap');
+            tautanWrap.style.display = ada && ada.link ? '' : 'none';
+            const tautanEl = document.getElementById('calDetailLink');
+            tautanEl.textContent = '';
+            if (ada && ada.link) {
+                const a = document.createElement('a');
+                a.href = ada.link;
+                a.target = '_blank';
+                a.rel = 'noopener';
+                a.textContent = ada.link;
+                tautanEl.appendChild(a);
+            }
+
+            // Hanya tindakan yang masuk akal untuk keadaan ini yang ditampilkan.
+            document.getElementById('calDetailConfirmBtn').style.display = ada ? 'none' : '';
+            document.getElementById('calDetailUndoBtn').style.display = ada ? '' : 'none';
+
+            document.getElementById('calDetailModal').classList.add('active');
+        }
+
         document.addEventListener('click', (e) => {
             const chip = e.target.closest('[data-cal-talent]');
             if (!chip) return;
+            bukaCalDetail(chip.dataset.calTalent, chip.dataset.calDate);
+        });
 
-            const talentId = chip.dataset.calTalent;
-            const tanggal = chip.dataset.calDate;
-            const ada = uploadOn(talentId, tanggal);
+        document.getElementById('calDetailConfirmBtn').addEventListener('click', () => {
+            if (!calDetailKonteks) return;
+            const { talentId, tanggal } = calDetailKonteks;
+            if (uploadOn(talentId, tanggal)) { tutupCalDetail(); return; }
 
-            if (ada) {
-                const pesan = ada.link
-                    ? 'Catatan upload ini punya tautan tersimpan. Hapus catatannya?'
-                    : 'Batalkan konfirmasi tayang untuk tanggal ini?';
-                if (!confirm(pesan)) return;
-                state.uploads = state.uploads.filter(u => u.id !== ada.id);
-            } else {
-                state.uploads.push({
-                    id: 'upload-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
-                    talentId: talentId,
-                    date: tanggal,
-                    title: 'Disahkan dari kalender',
-                    link: ''
-                });
-            }
+            state.uploads.push({
+                id: 'upload-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+                talentId: talentId,
+                date: tanggal,
+                title: 'Disahkan dari kalender',
+                link: ''
+            });
             saveData();
+            tutupCalDetail();
             render();
         });
+
+        document.getElementById('calDetailUndoBtn').addEventListener('click', () => {
+            if (!calDetailKonteks || !calDetailKonteks.uploadId) return;
+            const ada = state.uploads.find(u => u.id === calDetailKonteks.uploadId);
+            if (!ada) { tutupCalDetail(); return; }
+
+            const pesan = ada.link
+                ? 'Catatan ini punya tautan tersimpan (' + ada.link + '). Hapus catatan upload untuk tanggal ' + ada.date + '?'
+                : 'Batalkan konfirmasi tayang untuk tanggal ' + ada.date + '?';
+            if (!confirm(pesan)) return;
+
+            state.uploads = state.uploads.filter(u => u.id !== ada.id);
+            saveData();
+            tutupCalDetail();
+            render();
+        });
+
+        document.getElementById('calDetailCloseBtn').addEventListener('click', tutupCalDetail);
+        document.querySelector('#calDetailModal .modal-close').addEventListener('click', tutupCalDetail);
 
         document.getElementById('calPrev').addEventListener('click', () => {
             calCursor.m--;
