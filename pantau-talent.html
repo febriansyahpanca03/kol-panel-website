@@ -2867,5 +2867,47 @@
         let state = initializeData();
         render();
     </script>
+
+    <!--
+      Model data relasional (Tahap 1).
+
+      Blok ini SENGAJA terpisah dari skrip di atas dan tidak mengubahnya sama
+      sekali. Dashboard lama tetap membaca dan menulis "pantau-talent-data"
+      persis seperti sebelumnya; modul ini hanya menurunkan bentuk relasional
+      ke kunci terpisah, setelah membuat cadangan sekali jalan.
+
+      Belum menjadi penyimpanan bersama: localStorage terikat ke domain ini,
+      sehingga extension di tiktok.com tidak bisa membacanya. Pemindahan ke
+      penyimpanan bersama masih menunggu keputusan backend.
+    -->
+    <script type="module">
+        import { bootstrap, restoreBackup, previewMigration, V1_KEY, LEGACY_KEY } from './data/storage.js';
+        import * as model from './data/model.js';
+        import * as quota from './data/quota.js';
+
+        let laporan = { status: 'gagal', warnings: [] };
+        try {
+            laporan = bootstrap(window.localStorage);
+        } catch (err) {
+            // Halaman harus tetap hidup walau turunan model gagal dibuat.
+            console.warn('[Pantau Talent] Migrasi model relasional dilewati:', err);
+        }
+
+        // Dibuka untuk Tahap 2 (alur konten & kuota) dan untuk pemeriksaan manual.
+        window.PantauData = {
+            laporan,
+            model,
+            quota,
+            previewMigration,
+            pulihkanCadangan: () => restoreBackup(window.localStorage),
+            baca: () => JSON.parse(window.localStorage.getItem(V1_KEY) || 'null'),
+            KUNCI: { lama: LEGACY_KEY, baru: V1_KEY }
+        };
+
+        if (laporan.status === 'migrated' || laporan.status === 'migrated-not-saved') {
+            console.info('[Pantau Talent] Model relasional dibuat:', laporan.counts);
+            if (laporan.warnings.length) console.warn('[Pantau Talent] Catatan migrasi:', laporan.warnings);
+        }
+    </script>
 </body>
 </html>
