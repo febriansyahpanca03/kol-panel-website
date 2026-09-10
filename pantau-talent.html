@@ -1063,7 +1063,8 @@
             <div style="margin-bottom: var(--spacing-lg); display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
                 <button class="button button-primary" id="exportBtn">⬇ Unduh Cadangan</button>
                 <button class="button button-secondary" id="importBtn">⬆ Pulihkan Cadangan</button>
-                <button class="button button-success" id="syncNotionBtn">↻ Tarik Riwayat dari Notion</button>
+                <button class="button button-success" id="csvNotionBtn">↻ Tarik Riwayat dari Notion (CSV)</button>
+                <button class="button button-secondary button-small" id="syncNotionBtn" title="Perlu setelan token di server">Tarik langsung (perlu setelan)</button>
             </div>
             <div class="table-wrapper">
                 <table id="dataTable">
@@ -1330,6 +1331,7 @@
 
     <!-- Hidden input untuk import file -->
     <input type="file" id="importFile" accept=".json" style="display: none;">
+    <input type="file" id="csvNotionFile" accept=".csv,text/csv" style="display: none;">
 
     <script>
         // ============================================================================
@@ -2691,6 +2693,119 @@
         }
 
         document.getElementById('syncNotionBtn').addEventListener('click', tarikDariNotion);
+
+
+        // ============================================================================
+        // UNGGAH CSV DARI NOTION
+        // ============================================================================
+
+        // Notion mengekspor tanggal dalam beberapa bentuk tergantung bahasa dan
+        // setelan akun, jadi keempatnya diterima.
+        const BULAN_NAMA = {
+            january:1, february:2, march:3, april:4, may:5, june:6, july:7,
+            august:8, september:9, october:10, november:11, december:12,
+            januari:1, februari:2, maret:3, mei:5, juni:6, juli:7,
+            agustus:8, oktober:10, desember:12
+        };
+
+        function rakitIso(th, bl, hr) {
+            return th + '-' + String(bl).padStart(2, '0') + '-' + String(hr).padStart(2, '0');
+        }
+
+        function parseTanggalNotion(s) {
+            if (!s) return '';
+            s = String(s).trim();
+
+            let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (m) return m[1] + '-' + m[2] + '-' + m[3];
+
+            m = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
+            if (m && BULAN_NAMA[m[1].toLowerCase()]) return rakitIso(m[3], BULAN_NAMA[m[1].toLowerCase()], m[2]);
+
+            m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+            if (m && BULAN_NAMA[m[2].toLowerCase()]) return rakitIso(m[3], BULAN_NAMA[m[2].toLowerCase()], m[1]);
+
+            // Bentuk angka: Notion mengekspor bulan/hari/tahun.
+            m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (m) return rakitIso(m[3], m[1], m[2]);
+
+            return '';
+        }
+
+        // Pengurai CSV yang menghormati tanda kutip, karena judul konten bisa
+        // mengandung koma.
+        function parseCSV(teks) {
+            const hasil = [];
+            let kolom = '', baris = [], dalamKutip = false;
+            teks = String(teks).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            if (teks.charCodeAt(0) === 0xFEFF) teks = teks.slice(1);
+
+            for (let i = 0; i < teks.length; i++) {
+                const c = teks[i];
+                if (dalamKutip) {
+                    if (c === '"') {
+                        if (teks[i + 1] === '"') { kolom += '"'; i++; }
+                        else dalamKutip = false;
+                    } else kolom += c;
+                } else if (c === '"') {
+                    dalamKutip = true;
+                } else if (c === ',') {
+                    baris.push(kolom); kolom = '';
+                } else if (c === '\n') {
+                    baris.push(kolom); hasil.push(baris); baris = []; kolom = '';
+                } else kolom += c;
+            }
+            if (kolom.length || baris.length) { baris.push(kolom); hasil.push(baris); }
+            return hasil.filter(r => r.some(v => String(v).trim()));
+        }
+
+        function importCsvNotion(teks) {
+            const baris = parseCSV(teks);
+            if (baris.length < 2) { alert('Berkas CSV kosong atau tidak terbaca.'); return; }
+
+            const kepala = baris[0].map(h => String(h).trim().toLowerCase());
+            const iNama = kepala.indexOf('content name');
+            const iTgl = kepala.indexOf('film date');
+
+            if (iNama === -1 || iTgl === -1) {
+                alert('Kolom "Content name" atau "Film date" tidak ada di berkas ini.\n\nKolom yang terbaca:\n' +
+                      baris[0].join(', ') + '\n\nPastikan yang diekspor memang database Content Calendar.');
+                return;
+            }
+
+            const data = [];
+            let tanggalGagal = 0;
+            for (let i = 1; i < baris.length; i++) {
+                const nama = String(baris[i][iNama] || '').trim();
+                const mentah = String(baris[i][iTgl] || '').trim();
+                const tgl = parseTanggalNotion(mentah);
+                if (nama && tgl) data.push({ nama: nama, tgl: tgl });
+                else if (nama && mentah) tanggalGagal++;
+            }
+
+            if (!data.length) {
+                alert('Tidak ada baris yang bisa dibaca dari ' + (baris.length - 1) + ' baris.\n\nKemungkinan format tanggalnya tidak dikenali.');
+                return;
+            }
+            if (tanggalGagal) {
+                alert(tanggalGagal + ' baris dilewati karena tanggalnya tidak terbaca. Sisanya tetap diproses.');
+            }
+            terapkanRiwayatNotion(data);
+        }
+
+        document.getElementById('csvNotionBtn').addEventListener('click', () => {
+            document.getElementById('csvNotionFile').click();
+        });
+
+        document.getElementById('csvNotionFile').addEventListener('change', (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = ev => importCsvNotion(ev.target.result);
+            r.onerror = () => alert('Gagal membaca berkas.');
+            r.readAsText(f);
+            e.target.value = '';
+        });
 
 
         // ============================================================================
