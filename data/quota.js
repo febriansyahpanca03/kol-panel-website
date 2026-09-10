@@ -194,6 +194,33 @@ export function upsertVideo(state, nextId, { platform, platformVideoId, url = nu
 }
 
 /**
+ * Attaches a video to a content that already exists.
+ *
+ * This is how imported history gets its link later without being counted
+ * again: the content keeps its identity and its confirmation, only the video
+ * reference is filled in. Refuses when the content already points at a
+ * different video, so a mis-paste cannot quietly rewrite history.
+ */
+export function attachVideoToContent(state, nextId, contentId, videoId) {
+  const content = state.contents.find((c) => c.id === contentId);
+  const video = state.videos.find((v) => v.id === videoId);
+  if (!content || !video) return false;
+  if (content.videoId === videoId) return false;
+  if (content.videoId !== null) return false;
+
+  content.videoId = videoId;
+  if (!content.url && video.url) content.url = video.url;
+
+  recordEvent(state, nextId, {
+    type: "content.video_attached",
+    entity: "content",
+    entityId: contentId,
+    detail: { videoId, confirmedAt: content.confirmedAt },
+  });
+  return true;
+}
+
+/**
  * Appends an analytics reading. Measurements are an append-only history, so
  * the panel can say when a number was taken instead of implying it is live.
  * A reading identical to the previous one for the same video is skipped, so

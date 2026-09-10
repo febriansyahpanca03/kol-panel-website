@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pantau Talent — Cek Migrasi</title>
+<style>
+  :root{
+    --bg:#f6f8fa; --card:#fff; --fg:#1f2328; --muted:#59636e; --border:#d1d9e0;
+    --accent:#0969da; --ok:#1a7f37; --warn:#9a6700; --bad:#cf222e;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --card:#161b22; --fg:#e6edf3; --muted:#9198a1; --border:#3d444d;
+      --accent:#4493f8; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);line-height:1.6;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  header{background:#111827;color:#fff;padding:18px 20px}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;font-size:13px;opacity:.85}
+  main{max-width:900px;margin:0 auto;padding:24px 20px 80px}
+  section{background:var(--card);border:1px solid var(--border);border-radius:10px;
+    padding:20px;margin-bottom:16px}
+  h2{margin:0 0 4px;font-size:16px}
+  .lead{margin:0 0 16px;color:var(--muted);font-size:13px}
+  table{border-collapse:collapse;width:100%;display:block;overflow-x:auto;font-size:13px}
+  th,td{border:1px solid var(--border);padding:7px 10px;text-align:left;white-space:nowrap}
+  th{background:var(--bg);font-weight:650}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .ok{color:var(--ok);font-weight:600}
+  .warn{color:var(--warn);font-weight:600}
+  .bad{color:var(--bad);font-weight:600}
+  .note{background:var(--bg);border-left:3px solid var(--accent);padding:10px 12px;
+    border-radius:6px;font-size:13px;margin-top:12px}
+  ul{margin:8px 0;padding-left:20px;font-size:13px}
+  li{margin:4px 0}
+  .empty{color:var(--muted);font-size:13px}
+  a{color:var(--accent)}
+  code{background:var(--bg);border:1px solid var(--border);padding:1px 5px;
+    border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cek Migrasi Pantau Talent</h1>
+  <p>Halaman ini hanya membaca. Tidak ada data yang diubah, ditambah, atau dihapus.</p>
+</header>
+
+<main id="isi">
+  <section><p class="empty">Memuat…</p></section>
+</main>
+
+<script type="module">
+import { migrate, needsMigration } from './data/migrate.js';
+import { todayInJakarta } from './data/model.js';
+import { obligationProgress, allocationPerContent } from './data/quota.js';
+import { projectToLegacy } from './data/projection.js';
+
+const LEGACY_KEY = 'pantau-talent-data';
+const isi = document.getElementById('isi');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const angka = (n) => new Intl.NumberFormat('id-ID').format(n ?? 0);
+
+function bagian(judul, lead, isiHtml) {
+  return `<section><h2>${judul}</h2><p class="lead">${lead}</p>${isiHtml}</section>`;
+}
+
+function jalankan() {
+  const mentah = localStorage.getItem(LEGACY_KEY);
+
+  if (!mentah) {
+    isi.innerHTML = bagian('Tidak ada data', 'Belum ada data Pantau Talent di browser ini.',
+      `<p class="empty">Buka <a href="pantau-talent.html">dashboard</a> lebih dulu, lalu kembali ke sini.</p>`);
+    return;
+  }
+
+  let lama;
+  try {
+    lama = JSON.parse(mentah);
+  } catch (err) {
+    isi.innerHTML = bagian('Data tidak terbaca', 'Isi penyimpanan rusak sehingga tidak bisa diperiksa.',
+      `<p class="bad">${esc(err.message)}</p>`);
+    return;
+  }
+
+  if (!needsMigration(lama)) {
+    isi.innerHTML = bagian('Sudah dalam bentuk baru', 'Tidak ada yang perlu dimigrasikan.', '');
+    return;
+  }
+
+  const hari = todayInJakarta();
+  const { state, warnings } = migrate(lama, { now: new Date().toISOString() });
+  const proyeksi = projectToLegacy(state, hari);
+
+  const blok = [];
+
+  // --- Ringkasan jumlah ---------------------------------------------------
+  blok.push(bagian('Ringkasan', 'Apa yang dihasilkan dari data yang ada sekarang.', `
+    <table><tbody>
+      <tr><th>Talent</th><td class="num">${angka(state.talents.length)}</td></tr>
+      <tr><th>Akun sosial</th><td class="num">${angka(state.accounts.length)}</td></tr>
+      <tr><th>Kontrak</th><td class="num">${angka(state.contracts.length)}</td></tr>
+      <tr><th>Kewajiban konten</th><td class="num">${angka(state.obligations.length)}</td></tr>
+      <tr><th>Konten (dari riwayat upload)</th><td class="num">${angka(state.contents.length)}</td></tr>
+      <tr><th>Video dengan tautan terbaca</th><td class="num">${angka(state.videos.length)}</td></tr>
+    </tbody></table>`));
+
+  // --- Perbandingan kuota -------------------------------------------------
+  const lamaUploads = Array.isArray(lama.uploads) ? lama.uploads : [];
+  const baris = (Array.isArray(lama.talents) ? lama.talents : []).map((t) => {
+    const kuotaLama = Number(t.quota) || 0;
+    const terpakaiLama = lamaUploads.filter((u) => u.talentId === t.id).length;
+    const sisaLama = Math.max(0, kuotaLama - terpakaiLama);
+
+    const kewajiban = state.obligations.find((o) => o.contractId === `con_${t.id}`);
+    const p = kewajiban ? obligationProgress(state, kewajiban.id) : null;
+
+    const beda = p ? p.confirmed !== terpakaiLama || p.remaining !== sisaLama : true;
+    return { t, kuotaLama, terpakaiLama, sisaLama, p, beda };
+  });
+
+  const adaBeda = baris.some((b) => b.beda);
+  blok.push(bagian('Perbandingan kuota', 'Angka lama dibandingkan hasil hitungan baru, per talent.', `
+    <table>
+      <thead><tr>
+        <th>Talent</th><th>Akun</th>
+        <th class="num">Kuota</th>
+        <th class="num">Terpakai (lama)</th><th class="num">Sisa (lama)</th>
+        <th class="num">Terpakai (baru)</th><th class="num">Sisa (baru)</th>
+        <th class="num">Kelebihan</th><th>Status</th>
+      </tr></thead>
+      <tbody>${baris.map((b) => `
+        <tr>
+          <td>${esc(b.t.name)}</td>
+          <td>${esc(b.t.account || '—')}</td>
+          <td class="num">${angka(b.kuotaLama)}</td>
+          <td class="num">${angka(b.terpakaiLama)}</td>
+          <td class="num">${angka(b.sisaLama)}</td>
+          <td class="num">${b.p ? angka(b.p.confirmed) : '—'}</td>
+          <td class="num">${b.p ? angka(b.p.remaining) : '—'}</td>
+          <td class="num">${b.p ? angka(b.p.excess) : '—'}</td>
+          <td class="${b.beda ? 'warn' : 'ok'}">${b.beda ? 'berbeda' : 'sama'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="note">${adaBeda
+      ? 'Ada baris yang berbeda. Itu wajar bila riwayat lama sempat tercatat ganda, karena hitungan lama menjumlahkan baris upload sedangkan hitungan baru menghitung konten yang dikonfirmasi terhadap satu kewajiban.'
+      : 'Semua angka cocok. Migrasi tidak mengubah satu pun sisa kuota.'}</div>`));
+
+  // --- Alokasi biaya ------------------------------------------------------
+  const alokasi = state.obligations.map((o) => {
+    const k = state.contracts.find((c) => c.id === o.contractId);
+    const t = state.talents.find((x) => x.id === k?.talentId);
+    return { nama: t?.name ?? '—', nilai: k?.value ?? null, jumlah: o.quantity, per: allocationPerContent(state, o.id) };
+  });
+  blok.push(bagian('Biaya dari kontrak', 'Menggantikan perkiraan berbasis CPM. Kosong berarti belum bisa dihitung dengan benar.', `
+    <table>
+      <thead><tr><th>Talent</th><th class="num">Nilai kontrak</th><th class="num">Kuota</th><th class="num">Per konten</th></tr></thead>
+      <tbody>${alokasi.map((a) => `
+        <tr>
+          <td>${esc(a.nama)}</td>
+          <td class="num">${a.nilai === null ? '<span class="empty">Belum ada data</span>' : 'Rp' + angka(a.nilai)}</td>
+          <td class="num">${angka(a.jumlah)}</td>
+          <td class="num">${a.per === null ? '<span class="empty">Belum bisa dihitung</span>' : 'Rp' + angka(Math.round(a.per))}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`));
+
+  // --- Riwayat tanpa tautan ----------------------------------------------
+  const tanpaTautan = state.contents.filter((c) => c.videoId === null).length;
+  blok.push(bagian('Riwayat tanpa tautan video', 'Riwayat lama tetap dihitung walau belum punya tautan.', `
+    <table><tbody>
+      <tr><th>Konten dengan tautan terbaca</th><td class="num">${angka(state.contents.length - tanpaTautan)}</td></tr>
+      <tr><th>Konten tanpa tautan</th><td class="num">${angka(tanpaTautan)}</td></tr>
+    </tbody></table>
+    <div class="note">Semuanya tetap terhitung sebagai upload. Tautan boleh ditambahkan kemudian tanpa menambah hitungan.</div>`));
+
+  // --- Catatan migrasi ----------------------------------------------------
+  blok.push(bagian('Catatan', 'Hal yang perlu diperiksa sendiri.',
+    warnings.length
+      ? `<ul>${warnings.map((w) => `<li class="warn">${esc(w)}</li>`).join('')}</ul>`
+      : `<p class="ok">Tidak ada catatan. Semua baris terbaca utuh.</p>`));
+
+  // --- Cek balik ----------------------------------------------------------
+  const namaCocok = proyeksi.talents.length === (lama.talents || []).length;
+  const uploadCocok = proyeksi.uploads.length === lamaUploads.length;
+  blok.push(bagian('Cek balik', 'Model baru dikembalikan ke bentuk lama, lalu dibandingkan dengan aslinya.', `
+    <table><tbody>
+      <tr><th>Jumlah talent</th><td class="${namaCocok ? 'ok' : 'bad'}">${angka(proyeksi.talents.length)} vs ${angka((lama.talents || []).length)}</td></tr>
+      <tr><th>Jumlah upload</th><td class="${uploadCocok ? 'ok' : 'bad'}">${angka(proyeksi.uploads.length)} vs ${angka(lamaUploads.length)}</td></tr>
+    </tbody></table>
+    <div class="note">${namaCocok && uploadCocok
+      ? 'Bentuk lama bisa dibangun ulang utuh dari model baru. Tidak ada yang hilang.'
+      : 'Ada selisih. Jangan lanjut memindahkan penyimpanan sebelum ini dijelaskan.'}</div>`));
+
+  isi.innerHTML = blok.join('');
+}
+
+try {
+  jalankan();
+} catch (err) {
+  isi.innerHTML = `<section><h2>Gagal memeriksa</h2><p class="bad">${esc(err.message)}</p>
+    <p class="empty">Data asli tidak tersentuh.</p></section>`;
+  console.error(err);
+}
+</script>
+
+</body>
+</html>
