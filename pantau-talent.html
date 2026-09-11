@@ -1082,12 +1082,284 @@
                 padding: var(--spacing-sm);
             }
         }
+
+        /* ================================================================
+           BLOCKCRAFT THEME
+           A voxel-inspired visual layer with consistent tokens and motion.
+           ================================================================ */
+        :root {
+            --bg-page: #131b12;
+            --bg-panel: #283625;
+            --text-primary: #f4f1dc;
+            --text-secondary: #c9d2b8;
+            --text-tertiary: #9aaa88;
+            --border: #10170f;
+            --border-light: #4b6041;
+            --color-success: #4f8f38;
+            --color-success-light: #263f22;
+            --color-warning: #d99b34;
+            --color-warning-light: #49391d;
+            --color-danger: #c34b3f;
+            --color-danger-light: #472624;
+            --color-alert: #e2c24f;
+            --color-alert-light: #443e1e;
+            --radius-sm: 0;
+            --radius-md: 2px;
+            --pixel-shadow: 0 4px 0 #0b100a, 0 7px 18px rgba(0,0,0,.28);
+            --pixel-inset: inset 2px 2px 0 rgba(255,255,255,.11), inset -2px -2px 0 rgba(0,0,0,.28);
+            --motion-fast: 120ms;
+            --motion-normal: 220ms;
+            --ease-block: cubic-bezier(.2,.8,.2,1);
+        }
+
+        body {
+            min-height: 100vh;
+            background-color: #111a10;
+            background-image:
+                linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px),
+                radial-gradient(circle at 15% 5%, rgba(91,143,57,.22), transparent 32%),
+                linear-gradient(180deg, #192416 0, #10170f 360px);
+            background-size: 16px 16px, 16px 16px, auto, auto;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0 0 auto;
+            height: 8px;
+            background: repeating-linear-gradient(90deg, #73a94b 0 16px, #5b8d3d 16px 32px);
+            box-shadow: 0 5px 0 #3f6f31, 0 8px 0 #523d25;
+            z-index: 1000;
+        }
+
+        .container { max-width: 1240px; padding-top: 38px; }
+
+        .header {
+            position: relative;
+            overflow: hidden;
+            padding: 24px 26px;
+            margin-bottom: 22px;
+            border: 3px solid #10170f;
+            background:
+                linear-gradient(90deg, transparent 0 75%, rgba(255,255,255,.04) 75%),
+                linear-gradient(180deg, #659c43 0 12px, #426c31 12px 18px, #5b442b 18px 100%);
+            background-size: 32px 100%, 100% 100%;
+            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+        }
+
+        .header::after {
+            content: '';
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            right: 24px;
+            top: -36px;
+            opacity: .18;
+            transform: rotate(45deg);
+            background: repeating-linear-gradient(90deg, #fff 0 12px, transparent 12px 24px);
+        }
+
+        .header h1 {
+            margin: 0;
+            color: #fff8d9;
+            font-family: var(--font-mono);
+            font-size: clamp(26px, 5vw, 40px);
+            letter-spacing: -1px;
+            text-shadow: 3px 3px 0 #172012;
+        }
+
+        .header h1::before { content: '▦'; color: #bce36f; margin-right: 12px; }
+
+        .header-subtitle {
+            position: relative;
+            z-index: 1;
+            margin: 5px 0 0;
+            color: #e4d7b7;
+            font-size: 13px;
+        }
+
+        .tabs {
+            gap: 6px;
+            padding: 6px;
+            border: 3px solid #10170f;
+            background: #1c271a;
+            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+        }
+
+        .tab-button {
+            min-height: 44px;
+            border: 2px solid transparent;
+            color: #bdc9ae;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            transition: transform var(--motion-fast), color var(--motion-fast), background var(--motion-fast), box-shadow var(--motion-fast);
+        }
+
+        .tab-button:hover { color: #fff; background: #31432d; transform: translateY(-2px); }
+        .tab-button.active {
+            color: #152012;
+            border-color: #91bf61 #355c29 #355c29 #91bf61;
+            background: #6da34a;
+            box-shadow: inset 0 -3px 0 #4a7938;
+        }
+        .tab-button.active::after { display: none; }
+        .tab-button:active { transform: translateY(2px); box-shadow: none; }
+        .tab-content.active { animation: revealDown 220ms var(--ease-block); }
+
+        .summary-card,
+        .card,
+        .talent-card,
+        .table-wrapper,
+        .modal-content {
+            border: 3px solid #10170f;
+            background: #283625;
+            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+        }
+
+        .summary-card {
+            position: relative;
+            overflow: hidden;
+            transition: transform var(--motion-normal) var(--ease-block), border-color var(--motion-normal);
+        }
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 6px;
+            background: #6da34a;
+        }
+        .summary-card:hover { transform: translateY(-4px); border-color: #6f925f; }
+        .summary-value { color: #e6f59e; font-family: var(--font-mono); text-shadow: 2px 2px #111; }
+
+        .button,
+        .talent-search,
+        .talent-filter,
+        .field input,
+        .field select,
+        .field textarea {
+            border: 2px solid #10170f;
+            box-shadow: var(--pixel-inset);
+        }
+
+        .button {
+            position: relative;
+            overflow: hidden;
+            min-height: 40px;
+            font-family: var(--font-mono);
+            font-weight: 700;
+            letter-spacing: .01em;
+            transition: transform var(--motion-fast), filter var(--motion-fast), box-shadow var(--motion-fast);
+            box-shadow: var(--pixel-inset), 0 3px 0 #0b100a;
+        }
+        .button:hover { filter: brightness(1.16); transform: translateY(-2px); }
+        .button:active,
+        .button.block-click { transform: translateY(3px) scale(.985); box-shadow: var(--pixel-inset); }
+        .button-primary { background: #659c43; color: #fff; }
+        .button-secondary { background: #4e5b49; color: #f4f1dc; }
+        .button-success { background: #3f863e; }
+        .button-danger { background: #a84137; }
+
+        .talent-search,
+        .talent-filter,
+        .field input,
+        .field select,
+        .field textarea {
+            background: #172116;
+            color: #f4f1dc;
+            outline: none;
+            transition: border-color var(--motion-fast), box-shadow var(--motion-fast), transform var(--motion-fast);
+        }
+        .talent-search:focus,
+        .talent-filter:focus,
+        .field input:focus,
+        .field select:focus,
+        .field textarea:focus {
+            border-color: #a8d96f;
+            box-shadow: var(--pixel-inset), 0 0 0 3px rgba(132,190,82,.22);
+            transform: translateY(-1px);
+        }
+
+        .talent-card {
+            transition: transform var(--motion-normal) var(--ease-block), border-color var(--motion-normal);
+        }
+        .talent-card:hover { transform: translateY(-3px); border-color: #627e56; }
+        .talent-card-header { border: 0; transition: background var(--motion-fast); }
+        .talent-card-header:hover { background: #34472f; }
+        .talent-card.expanded { animation: blockOpen 240ms var(--ease-block); }
+        .talent-card.expanded .talent-card-body { animation: revealDown 240ms var(--ease-block); }
+        .talent-card-platform { background: #172116; border: 1px solid #52684a; color: #bce36f; }
+        .talent-card-quota-number { color: #e7f69e; text-shadow: 2px 2px #111; }
+
+        .quota-box { border: 2px solid #0d140c; box-shadow: var(--pixel-inset); }
+        .quota-box.filled { background: #72ad4c; animation: popBlock 180ms var(--ease-block); }
+        .progress-bar { border: 2px solid #0d140c; background: #151e14; height: 26px; }
+        .progress-bar-fill { background: repeating-linear-gradient(90deg, #62a946 0 14px, #6fb950 14px 28px); }
+
+        .alert-item { border: 2px solid currentColor; border-left-width: 8px; box-shadow: 0 3px 0 rgba(0,0,0,.28); animation: revealDown 240ms var(--ease-block); }
+        .empty-state { min-height: 240px; display: grid; place-content: center; }
+        .empty-state-icon { color: #93c75a; font-family: var(--font-mono); animation: floatBlock 2.4s ease-in-out infinite; }
+        .empty-state-title { color: #e9efd9; font-family: var(--font-mono); }
+
+        th { color: #dfe8cf; background: #1c271a; }
+        td { border-color: #42523b; }
+        tr:hover td { background: #31422d; }
+
+        .modal { backdrop-filter: blur(3px); }
+        .modal.active .modal-content { animation: modalCraft 220ms var(--ease-block); }
+        .modal-close { transition: transform var(--motion-fast), color var(--motion-fast); }
+        .modal-close:hover { transform: rotate(90deg) scale(1.12); color: #ef695c; }
+
+        @keyframes blockOpen {
+            from { transform: scale(.985); }
+            to { transform: scale(1); }
+        }
+        @keyframes revealDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes popBlock {
+            from { transform: scale(.72); }
+            to { transform: scale(1); }
+        }
+        @keyframes floatBlock {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-7px); }
+        }
+        @keyframes modalCraft {
+            from { opacity: 0; transform: translateY(18px) scale(.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes clickBurst {
+            0% { transform: scale(.7); opacity: .7; }
+            100% { transform: scale(1.35); opacity: 0; }
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 28px 10px 24px; }
+            .header { padding: 21px 17px; }
+            .header::after { display: none; }
+            .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .tab-button:last-child { grid-column: 1 / -1; }
+            .summary-card { padding: 14px; }
+            .summary-value { font-size: 24px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                scroll-behavior: auto !important;
+                transition-duration: .01ms !important;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>Pantau Talent</h1>
+            <p class="header-subtitle">Command center untuk kontrak, kuota, dan jadwal konten.</p>
         </div>
 
         <div class="tabs" role="tablist" aria-label="Menu utama">
@@ -3062,6 +3334,20 @@
         document.getElementById('addTalentBtn').addEventListener('click', () => openTalentModal());
         document.getElementById('talentSearch').addEventListener('input', renderTalentTab);
         document.getElementById('talentPlatformFilter').addEventListener('change', renderTalentTab);
+
+        // Umpan balik bergaya tombol game: setiap klik terasa seperti blok
+        // yang benar-benar ditekan, termasuk tombol yang dibuat saat render.
+        document.addEventListener('pointerdown', event => {
+            const target = event.target.closest('.button');
+            if (!target) return;
+            target.classList.remove('block-click');
+            void target.offsetWidth;
+            target.classList.add('block-click');
+        });
+        document.addEventListener('pointerup', event => {
+            const target = event.target.closest('.button');
+            if (target) window.setTimeout(() => target.classList.remove('block-click'), 120);
+        });
 
         // Satu pendengar untuk semua tombol surat, di kartu talent maupun di
         // tabel Data Kontrak, tanpa perlu dipasang ulang tiap render.
