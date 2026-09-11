@@ -354,7 +354,57 @@
         .empty-state-text {
             font-size: 14px;
             line-height: 1.6;
+            color: var(--text-secondary);
         }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+        }
+
+        .summary-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-md);
+            padding: var(--spacing-lg);
+        }
+
+        .summary-value {
+            display: block;
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .summary-label {
+            display: block;
+            margin-top: var(--spacing-xs);
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+
+        .talent-toolbar {
+            display: flex;
+            align-items: center;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-lg);
+        }
+
+        .talent-search,
+        .talent-filter {
+            min-height: 42px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            font: inherit;
+            padding: 0 var(--spacing-md);
+        }
+
+        .talent-search { flex: 1; min-width: 180px; }
+        .talent-filter { min-width: 150px; }
 
         /* Today Tab Styles */
         .alert-group {
@@ -1000,6 +1050,25 @@
         }
 
         @media (max-width: 768px) {
+            .tabs {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 0;
+                overflow: visible;
+            }
+
+            .tab-button {
+                min-height: 44px;
+                padding: var(--spacing-sm);
+                border-bottom: 1px solid var(--border-light);
+            }
+
+            .tab-button:last-child { grid-column: 1 / -1; }
+
+            .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .talent-toolbar { align-items: stretch; flex-direction: column; }
+            .talent-filter { width: 100%; }
+
             .modal-content {
                 padding: var(--spacing-lg);
                 max-height: 95vh;
@@ -1021,22 +1090,29 @@
             <h1>Pantau Talent</h1>
         </div>
 
-        <div class="tabs">
-            <button class="tab-button active" data-tab="today">Hari Ini</button>
-            <button class="tab-button" data-tab="talent">Talent</button>
-            <button class="tab-button" data-tab="kalender">Kalender</button>
-            <button class="tab-button" data-tab="data">Data Kontrak</button>
-            <button class="tab-button" data-tab="settings">Ambang Peringatan</button>
+        <div class="tabs" role="tablist" aria-label="Menu utama">
+            <button class="tab-button active" data-tab="today" role="tab" aria-selected="true" aria-controls="today">Hari Ini</button>
+            <button class="tab-button" data-tab="talent" role="tab" aria-selected="false" aria-controls="talent">Talent</button>
+            <button class="tab-button" data-tab="kalender" role="tab" aria-selected="false" aria-controls="kalender">Kalender</button>
+            <button class="tab-button" data-tab="data" role="tab" aria-selected="false" aria-controls="data">Data Kontrak</button>
+            <button class="tab-button" data-tab="settings" role="tab" aria-selected="false" aria-controls="settings">Ambang Peringatan</button>
         </div>
 
         <!-- TAB: HARI INI -->
-        <div id="today" class="tab-content active">
+        <div id="today" class="tab-content active" role="tabpanel">
             <div id="todayContainer"></div>
         </div>
 
         <!-- TAB: TALENT -->
-        <div id="talent" class="tab-content">
-            <div style="margin-bottom: var(--spacing-lg);">
+        <div id="talent" class="tab-content" role="tabpanel">
+            <div class="talent-toolbar">
+                <input class="talent-search" id="talentSearch" type="search" placeholder="Cari nama atau akun talent…" aria-label="Cari talent">
+                <select class="talent-filter" id="talentPlatformFilter" aria-label="Filter platform">
+                    <option value="">Semua platform</option>
+                    <option value="TikTok">TikTok</option>
+                    <option value="Instagram">Instagram</option>
+                    <option value="Threads">Threads</option>
+                </select>
                 <button class="button button-primary" id="addTalentBtn">+ Tambah Talent</button>
             </div>
             <div id="talentContainer"></div>
@@ -1667,12 +1743,33 @@
             return alerts;
         }
 
+        function renderSummaryCards(alerts) {
+            const activeTalents = state.talents.filter(t => daysUntil(t.endDate) >= 0).length;
+            const currentMonth = todayIso().slice(0, 7);
+            const uploadsThisMonth = state.uploads.filter(u => (u.date || '').slice(0, 7) === currentMonth).length;
+            const pendingCount = alerts.pendingSlot.length;
+            const attentionCount = new Set(
+                Object.values(alerts).flat().map(alert => alert.talentId)
+            ).size;
+
+            return `
+                <div class="summary-grid" aria-label="Ringkasan kerja">
+                    <div class="summary-card"><span class="summary-value">${activeTalents}</span><span class="summary-label">Talent aktif</span></div>
+                    <div class="summary-card"><span class="summary-value">${uploadsThisMonth}</span><span class="summary-label">Tayang bulan ini</span></div>
+                    <div class="summary-card"><span class="summary-value">${pendingCount}</span><span class="summary-label">Menunggu konfirmasi</span></div>
+                    <div class="summary-card"><span class="summary-value">${attentionCount}</span><span class="summary-label">Perlu perhatian</span></div>
+                </div>
+            `;
+        }
+
         function renderTodayTab() {
             const alerts = generateTodayAlerts();
             const hasAny = Object.values(alerts).some(arr => arr.length > 0);
+            const summary = renderSummaryCards(alerts);
 
             if (!hasAny) {
                 document.getElementById('todayContainer').innerHTML = `
+                    ${summary}
                     <div class="empty-state">
                         <div class="empty-state-icon">✓</div>
                         <div class="empty-state-title">Semua dalam kendali</div>
@@ -1682,7 +1779,7 @@
                 return;
             }
 
-            let html = '<div class="alert-group">';
+            let html = summary + '<div class="alert-group">';
 
             if (alerts.pendingSlot.length > 0) {
                 html += '<div class="alert-group-title">Jadwal Terlewat, Perlu Dikonfirmasi</div>';
@@ -1798,6 +1895,14 @@
 
         function renderTalentTab() {
             const container = document.getElementById('talentContainer');
+            const search = (document.getElementById('talentSearch').value || '').trim().toLocaleLowerCase('id-ID');
+            const platform = document.getElementById('talentPlatformFilter').value;
+            const filteredTalents = state.talents.filter(talent => {
+                const matchesText = !search || [talent.name, talent.account]
+                    .some(value => String(value || '').toLocaleLowerCase('id-ID').includes(search));
+                const matchesPlatform = !platform || talent.platform === platform;
+                return matchesText && matchesPlatform;
+            });
 
             if (state.talents.length === 0) {
                 container.innerHTML = `
@@ -1810,7 +1915,18 @@
                 return;
             }
 
-            container.innerHTML = state.talents.map(talent => {
+            if (filteredTalents.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⌕</div>
+                        <div class="empty-state-title">Talent tidak ditemukan</div>
+                        <div class="empty-state-text">Coba kata pencarian atau pilihan platform yang lain.</div>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filteredTalents.map(talent => {
                 const remaining = getRemainingQuota(talent.id);
                 const uploads = getUploadCountForTalent(talent.id);
                 const daysLeft = daysUntil(talent.endDate);
@@ -1848,7 +1964,7 @@
 
                 return `
                     <div class="talent-card" data-talent-id="${talent.id}">
-                        <div class="talent-card-header">
+                        <div class="talent-card-header" role="button" tabindex="0" aria-expanded="false">
                             <div class="talent-card-info">
                                 <div class="talent-card-name">${talent.name}</div>
                                 <div class="talent-card-account">@${talent.account}</div>
@@ -1913,6 +2029,13 @@
             document.querySelectorAll('.talent-card-header').forEach(header => {
                 header.addEventListener('click', () => {
                     header.parentElement.classList.toggle('expanded');
+                    header.setAttribute('aria-expanded', header.parentElement.classList.contains('expanded'));
+                });
+                header.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        header.click();
+                    }
                 });
             });
 
@@ -2924,8 +3047,10 @@
 
                 document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-button').forEach(b => b.setAttribute('aria-selected', 'false'));
 
                 btn.classList.add('active');
+                btn.setAttribute('aria-selected', 'true');
                 document.getElementById(tabName).classList.add('active');
             });
         });
@@ -2935,6 +3060,8 @@
         // ============================================================================
 
         document.getElementById('addTalentBtn').addEventListener('click', () => openTalentModal());
+        document.getElementById('talentSearch').addEventListener('input', renderTalentTab);
+        document.getElementById('talentPlatformFilter').addEventListener('change', renderTalentTab);
 
         // Satu pendengar untuk semua tombol surat, di kartu talent maupun di
         // tabel Data Kontrak, tanpa perlu dipasang ulang tiap render.
