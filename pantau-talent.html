@@ -15,24 +15,67 @@
             box-sizing: border-box;
         }
 
+        /* ================================================================
+           EMERALD CONSOLE — SATU-SATUNYA SUMBER WARNA
+           Tidak boleh ada hex literal di luar blok ini.
+           ================================================================ */
         :root {
-            --bg-page: #f3f3f3;
-            --bg-panel: #ffffff;
-            --text-primary: #1a1a1a;
-            --text-secondary: #666666;
-            --text-tertiary: #999999;
-            --border: #d9d9d9;
-            --border-light: #e8e8e8;
+            /* --- permukaan --- */
+            --bg:        #071310;
+            --surface:   #102019;
+            --surface-2: #14291F;
+            --line:      #234438;
 
-            --color-success: #2d5f3e;
-            --color-success-light: #e8f0eb;
-            --color-warning: #a85c36;
-            --color-warning-light: #f5ead6;
-            --color-danger: #8b4426;
-            --color-danger-light: #f2e4d9;
-            --color-alert: #b8860b;
-            --color-alert-light: #f5f1e0;
+            /* --- teks --- */
+            --txt:       #E6F2EE;   /* 14.7:1 di surface */
+            --txt-muted: #8FB3A4;   /*  7.4:1 di surface */
 
+            /* --- aksen tunggal --- */
+            --accent:       #34D399;
+            --accent-hover: #5EEAD4;
+            --on-accent:    #071310; /* 9.8:1 di atas accent */
+
+            /* --- status: arti tetap, jangan dipakai dekoratif --- */
+            --warn:   #FCD34D;  /* jadwal belum dikonfirmasi */
+            --danger: #FF7A7A;  /* tertinggal dari target */
+            --ok:     #4ADE80;  /* target tercapai */
+            --info:   #60A5FA;  /* kontrak & kuota */
+
+            /* --- isi badge: warna status + 15% alpha --- */
+            --warn-bg:   rgba(252, 211, 77, .15);
+            --danger-bg: rgba(255, 122, 122, .15);
+            --ok-bg:     rgba(74, 222, 128, .15);
+            --info-bg:   rgba(96, 165, 250, .15);
+
+            /* --- turunan: bayangan & lapisan, dipakai komponen --- */
+            --shadow-raise: 0 2px 0 rgba(3, 9, 7, .9), 0 10px 24px rgba(3, 9, 7, .45);
+            --shadow-press: 0 1px 0 rgba(3, 9, 7, .9);
+            --accent-ring:  rgba(52, 211, 153, .28);
+            --scrim:        rgba(7, 19, 16, .78);
+            --accent-wash:  rgba(52, 211, 153, .10);
+            --starlight:    rgba(230, 242, 238, .55);
+
+            /* --- alias kompatibilitas: komponen lama tetap jalan,
+                   tapi nilainya tetap bersumber dari token di atas --- */
+            --bg-page:      var(--bg);
+            --bg-panel:     var(--surface);
+            --bg-sunken:    var(--bg);
+            --text-primary: var(--txt);
+            --text-secondary: var(--txt-muted);
+            --text-tertiary:  var(--txt-muted);
+            --border:       var(--line);
+            --border-light: var(--line);
+
+            --color-success:       var(--ok);
+            --color-success-light: var(--ok-bg);
+            --color-warning:       var(--warn);
+            --color-warning-light: var(--warn-bg);
+            --color-danger:        var(--danger);
+            --color-danger-light:  var(--danger-bg);
+            --color-alert:         var(--info);
+            --color-alert-light:   var(--info-bg);
+
+            /* --- spasi & bentuk --- */
             --spacing-xs: 4px;
             --spacing-sm: 8px;
             --spacing-md: 12px;
@@ -43,20 +86,17 @@
             --radius-sm: 2px;
             --radius-md: 4px;
 
-            --font-mono: 'Courier New', monospace;
+            /* --- tipografi --- */
+            --font-mono: ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+            --font-pixel: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+
+            /* --- motion --- */
+            --motion-fast: 120ms;
+            --motion-normal: 220ms;
+            --ease-block: cubic-bezier(.2, .8, .2, 1);
         }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg-page: #1a1a1a;
-                --bg-panel: #2a2a2a;
-                --text-primary: #ffffff;
-                --text-secondary: #b3b3b3;
-                --text-tertiary: #666666;
-                --border: #404040;
-                --border-light: #333333;
-            }
-        }
+        :root { color-scheme: dark; }
 
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -212,16 +252,8 @@
         .field select:focus,
         .field textarea:focus {
             outline: none;
-            border-color: var(--text-primary);
-            box-shadow: 0 0 0 2px rgba(26, 26, 26, 0.1);
-        }
-
-        @media (prefers-color-scheme: dark) {
-            .field input:focus,
-            .field select:focus,
-            .field textarea:focus {
-                box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
-            }
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-ring);
         }
 
         .button {
@@ -430,59 +462,84 @@
             margin-top: 0;
         }
 
+        /* Kartu peringatan: permukaan netral, status dibawa strip kiri.
+           --status diwarisi ke anak-anaknya (angka penting, badge). */
         .alert-item {
+            --status: var(--info);
             padding: var(--spacing-lg);
             border-radius: var(--radius-md);
-            border-left: 4px solid transparent;
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--status);
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: var(--spacing-lg);
         }
 
-        .alert-item.today {
-            background-color: var(--color-warning-light);
-            border-left-color: var(--color-warning);
-            color: var(--color-warning);
-        }
+        /* jadwal belum dikonfirmasi */
+        .alert-item.today,
+        .alert-item.pending { --status: var(--warn); }
 
-        .alert-item.overdue {
-            background-color: var(--color-danger-light);
-            border-left-color: var(--color-danger);
-            color: var(--color-danger);
-        }
+        /* tertinggal dari target / kontrak habis */
+        .alert-item.behind,
+        .alert-item.overdue { --status: var(--danger); }
 
-        .alert-item.behind {
-            background-color: var(--color-alert-light);
-            border-left-color: var(--color-alert);
-            color: var(--color-alert);
-        }
+        /* kontrak & kuota */
+        .alert-item.low,
+        .alert-item.soon { --status: var(--info); }
 
-        .alert-item.low {
-            background-color: var(--color-warning-light);
-            border-left-color: var(--color-warning);
-            color: var(--color-warning);
-        }
-
-        .alert-item.soon {
-            background-color: var(--color-alert-light);
-            border-left-color: var(--color-alert);
-            color: var(--color-alert);
-        }
+        /* target tercapai */
+        .alert-item.done { --status: var(--ok); }
 
         .alert-item-content {
             flex: 1;
+            min-width: 0;
         }
 
         .alert-item-title {
             font-weight: 600;
             margin-bottom: 2px;
+            color: var(--txt);
+            word-break: break-word;
         }
 
         .alert-item-detail {
             font-size: 12px;
-            opacity: 0.85;
+            color: var(--txt-muted);
         }
+
+        /* angka penting di baris meta memakai warna status yang sama
+           dengan strip kiri */
+        .alert-item-detail strong,
+        .alert-item-detail .num {
+            color: var(--status);
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* label status: statusnya terbaca dari teks, bukan warna saja */
+        .status-tag {
+            display: inline-block;
+            margin-right: var(--spacing-sm);
+            padding: 2px 6px;
+            border-radius: var(--radius-sm);
+            background-color: var(--status-bg, var(--info-bg));
+            color: var(--status);
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            vertical-align: 1px;
+        }
+
+        .alert-item.today .status-tag,
+        .alert-item.pending .status-tag { --status-bg: var(--warn-bg); }
+        .alert-item.behind .status-tag,
+        .alert-item.overdue .status-tag { --status-bg: var(--danger-bg); }
+        .alert-item.low .status-tag,
+        .alert-item.soon .status-tag { --status-bg: var(--info-bg); }
+        .alert-item.done .status-tag { --status-bg: var(--ok-bg); }
 
         .alert-item-action {
             flex-shrink: 0;
@@ -490,12 +547,20 @@
 
         /* Talent Card Styles */
         .talent-card {
-            background-color: var(--bg-panel);
-            border: 1px solid var(--border-light);
+            --status: var(--ok);
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-left: 4px solid var(--status);
             border-radius: var(--radius-md);
             overflow: hidden;
             margin-bottom: var(--spacing-lg);
         }
+
+        .talent-card.overdue { --status: var(--danger); }
+        .talent-card.behind  { --status: var(--danger); }
+        .talent-card.low     { --status: var(--info); }
+        .talent-card.soon    { --status: var(--info); }
+        .talent-card.pending { --status: var(--warn); }
 
         .talent-card-header {
             padding: var(--spacing-lg);
@@ -509,7 +574,7 @@
         }
 
         .talent-card-header:hover {
-            background-color: var(--border-light);
+            background-color: var(--surface-2);
         }
 
         .talent-card-info {
@@ -517,28 +582,34 @@
             min-width: 0;
         }
 
+        /* Nama talent: sans, bukan pixel — nama panjang seperti
+           "Yehezkiel Patrick Halomoan Djaja" harus tetap terbaca utuh. */
         .talent-card-name {
             font-size: 16px;
             font-weight: 600;
+            color: var(--txt);
             margin-bottom: var(--spacing-xs);
-            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
         .talent-card-account {
             font-size: 12px;
-            color: var(--text-tertiary);
+            color: var(--txt-muted);
             margin-bottom: 4px;
-            word-break: break-word;
+            overflow-wrap: anywhere;
         }
 
+        /* Platform adalah kategori, bukan status — jadi netral.
+           Warna status hanya untuk arti status, tidak pernah dekoratif. */
         .talent-card-platform {
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            color: var(--text-tertiary);
+            color: var(--txt-muted);
             display: inline-block;
-            background-color: var(--border-light);
+            background-color: var(--surface-2);
+            border: 0;
             padding: 2px 6px;
             border-radius: var(--radius-sm);
         }
@@ -923,13 +994,13 @@
         }
 
         .cal-chip.done {
-            background-color: var(--color-success);
-            color: #ffffff;
+            background-color: var(--ok);
+            color: var(--on-accent);
         }
 
         .cal-chip.pending {
-            background-color: var(--color-warning);
-            color: #ffffff;
+            background-color: var(--warn);
+            color: var(--on-accent);
         }
 
         .cal-chip.future {
@@ -957,7 +1028,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: var(--scrim);
             z-index: 1000;
             padding: var(--spacing-lg);
             overflow-y: auto;
@@ -1086,106 +1157,59 @@
         }
 
         /* ================================================================
-           COSMOCHAIN THEME
-           Retro-pixel deep space: starfield, light beam, astronaut mascot.
-           Pixel type for chrome, readable sans for data.
+           EMERALD CONSOLE — LAPISAN KOMPONEN
+           Semua warna di bawah ini merujuk token di :root. Tidak ada hex.
+           Proporsi 60/30/10: --bg mendominasi, --surface untuk panel,
+           --accent hanya untuk judul seksi, tombol primer, link, angka.
            ================================================================ */
-        :root {
-            --bg-page: #050916;
-            --bg-panel: #0f1838;
-            --bg-sunken: #080f24;
-            --text-primary: #eaf1ff;
-            --text-secondary: #9fb3dd;
-            --text-tertiary: #6d82ae;
-            --border: #04070f;
-            --border-light: #24356b;
-
-            --blue-bright: #4da6ff;
-            --blue-glow: #6ee2ff;
-            --blue-deep: #1b3ea8;
-
-            --color-success: #2f9e6b;
-            --color-success-light: #0c2b22;
-            --color-warning: #c98524;
-            --color-warning-light: #33240c;
-            --color-danger: #c4404f;
-            --color-danger-light: #2e0f17;
-            --color-alert: #c9a227;
-            --color-alert-light: #2e2708;
-
-            --radius-sm: 0;
-            --radius-md: 0;
-
-            --pixel-shadow: 0 4px 0 #04070f, 0 10px 26px rgba(4, 12, 40, .55);
-            --pixel-inset: inset 2px 2px 0 rgba(122, 176, 255, .14), inset -2px -2px 0 rgba(0, 0, 0, .45);
-            --glow-soft: 0 0 18px rgba(77, 166, 255, .35);
-
-            --font-pixel: 'Press Start 2P', 'Courier New', monospace;
-            --motion-fast: 120ms;
-            --motion-normal: 220ms;
-            --ease-block: cubic-bezier(.2, .8, .2, 1);
-        }
 
         body {
             min-height: 100vh;
-            background-color: #050916;
+            background-color: var(--bg);
             background-image:
-                radial-gradient(2px 2px at 12% 14%, rgba(255,255,255,.75), transparent 50%),
-                radial-gradient(2px 2px at 78% 9%, rgba(160,210,255,.7), transparent 50%),
-                radial-gradient(2px 2px at 34% 31%, rgba(255,255,255,.5), transparent 50%),
-                radial-gradient(2px 2px at 63% 46%, rgba(190,225,255,.55), transparent 50%),
-                radial-gradient(2px 2px at 88% 62%, rgba(255,255,255,.45), transparent 50%),
-                radial-gradient(2px 2px at 21% 71%, rgba(170,215,255,.5), transparent 50%),
-                radial-gradient(2px 2px at 49% 88%, rgba(255,255,255,.4), transparent 50%),
-                linear-gradient(rgba(77,166,255,.035) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(77,166,255,.035) 1px, transparent 1px),
-                radial-gradient(circle at 50% -10%, rgba(45,120,255,.28), transparent 55%),
-                linear-gradient(180deg, #0a1233 0, #050916 100%);
-            background-size:
-                auto, auto, auto, auto, auto, auto, auto,
-                16px 16px, 16px 16px,
-                auto, auto;
+                radial-gradient(1px 1px at 12% 14%, var(--starlight), transparent 55%),
+                radial-gradient(1px 1px at 78% 9%,  var(--starlight), transparent 55%),
+                radial-gradient(1px 1px at 34% 31%, var(--starlight), transparent 55%),
+                radial-gradient(1px 1px at 63% 46%, var(--starlight), transparent 55%),
+                radial-gradient(1px 1px at 88% 62%, var(--starlight), transparent 55%),
+                radial-gradient(1px 1px at 21% 71%, var(--starlight), transparent 55%),
+                radial-gradient(circle at 50% -12%, var(--accent-wash), transparent 55%);
             background-attachment: fixed;
         }
 
-        /* Pixel rail across the top */
+        /* rel piksel tipis di puncak layar — satu-satunya aksen dekoratif */
         body::before {
             content: '';
             position: fixed;
             inset: 0 0 auto;
-            height: 6px;
-            background: repeating-linear-gradient(90deg,
-                var(--blue-bright) 0 12px,
-                var(--blue-deep) 12px 24px);
-            box-shadow: 0 4px 0 #071233, 0 6px 22px rgba(77,166,255,.45);
+            height: 3px;
+            background-color: var(--accent);
             z-index: 1000;
         }
 
-        .container { max-width: 1240px; padding-top: 38px; }
+        .container { max-width: 1240px; padding-top: 34px; }
 
-        /* ---------- Header with astronaut ---------- */
+        /* ---------------- Header ---------------- */
         .header {
             position: relative;
             overflow: hidden;
-            padding: 30px 26px 28px;
+            min-height: 104px;
+            padding: 28px 130px 26px 26px;
             margin-bottom: 22px;
-            border: 3px solid #04070f;
-            background:
-                radial-gradient(circle at 50% 120%, rgba(110,226,255,.20), transparent 60%),
-                linear-gradient(180deg, #14224f 0, #0a1231 100%);
-            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
         }
 
-        /* Light beam rising behind the mascot */
         .header::before {
             content: '';
             position: absolute;
-            right: 58px;
+            right: 52px;
             bottom: 0;
-            width: 190px;
+            width: 170px;
             height: 100%;
             clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
-            background: linear-gradient(180deg, rgba(110,226,255,0) 0, rgba(110,226,255,.30) 100%);
+            background: linear-gradient(180deg, transparent 0, var(--accent-wash) 100%);
             animation: beamPulse 3.6s ease-in-out infinite;
             pointer-events: none;
         }
@@ -1194,245 +1218,278 @@
             position: relative;
             z-index: 2;
             margin: 0;
-            color: #ffffff;
+            color: var(--accent);
             font-family: var(--font-pixel);
-            font-size: clamp(16px, 3.4vw, 30px);
-            line-height: 1.35;
-            letter-spacing: 1px;
-            text-shadow: 3px 3px 0 #04070f, 0 0 22px rgba(77,166,255,.55);
+            font-size: clamp(12px, 2.6vw, 13px);
+            line-height: 1.6;
+            letter-spacing: .04em;
+            text-transform: uppercase;
         }
 
         .header-subtitle {
             position: relative;
             z-index: 2;
-            margin: 14px 0 0;
+            margin: 12px 0 0;
             max-width: 46ch;
-            color: #a9c0ea;
+            color: var(--txt-muted);
             font-size: 13px;
         }
 
+        /* tinggi = lebar x 20/16, jadi 64px -> 80px; header minimal 104px
+           supaya maskot tidak terpotong oleh overflow:hidden */
         .pixel-astronaut {
             position: absolute;
-            right: 34px;
-            bottom: 8px;
-            width: 108px;
+            right: 28px;
+            bottom: 10px;
+            width: 64px;
             height: auto;
             z-index: 1;
             image-rendering: pixelated;
-            filter: drop-shadow(0 0 14px rgba(110,226,255,.55));
             animation: floatBlock 3.4s ease-in-out infinite;
         }
 
-        /* ---------- Tabs ---------- */
+        /* ---------------- Tabs ---------------- */
         .tabs {
             flex-wrap: wrap;
-            gap: 6px;
-            padding: 6px;
-            border: 3px solid #04070f;
-            background: #0a1231;
-            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+            gap: 4px;
+            padding: 4px;
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
         }
 
         .tab-button {
             min-height: 44px;
-            border: 2px solid transparent;
-            color: #9fb3dd;
+            border: 0;
+            border-radius: var(--radius-sm);
+            color: var(--txt-muted);
             font-family: var(--font-pixel);
             font-size: 10px;
             line-height: 1.6;
-            transition: transform var(--motion-fast), color var(--motion-fast),
-                        background var(--motion-fast), box-shadow var(--motion-fast);
+            background-color: transparent;
+            transition: color var(--motion-fast), background-color var(--motion-fast);
         }
 
-        .tab-button:hover { color: #fff; background: #172a5e; transform: translateY(-2px); }
+        .tab-button:hover { color: var(--txt); background-color: var(--surface-2); }
         .tab-button.active {
-            color: #04122e;
-            border-color: #8fd0ff #14418f #14418f #8fd0ff;
-            background: var(--blue-bright);
-            box-shadow: inset 0 -3px 0 #1d6ec4, var(--glow-soft);
+            color: var(--on-accent);
+            background-color: var(--accent);
         }
         .tab-button.active::after { display: none; }
-        .tab-button:active { transform: translateY(2px); box-shadow: none; }
         .tab-content.active { animation: revealDown 220ms var(--ease-block); }
 
-        /* ---------- Panels ---------- */
+        /* ---------------- Panel ---------------- */
         .summary-card,
         .card,
-        .talent-card,
         .table-wrapper,
         .modal-content {
-            border: 3px solid #04070f;
-            background: var(--bg-panel);
-            box-shadow: var(--pixel-shadow), var(--pixel-inset);
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-md);
         }
 
         .summary-card {
             position: relative;
             overflow: hidden;
-            transition: transform var(--motion-normal) var(--ease-block),
-                        border-color var(--motion-normal), box-shadow var(--motion-normal);
+            border-left: 4px solid var(--accent);
+            transition: background-color var(--motion-normal);
         }
-        .summary-card::before {
-            content: '';
-            position: absolute;
-            inset: 0 auto 0 0;
-            width: 6px;
-            background: var(--blue-bright);
-            box-shadow: var(--glow-soft);
-        }
-        .summary-card:hover {
-            transform: translateY(-4px);
-            border-color: var(--blue-deep);
-            box-shadow: var(--pixel-shadow), var(--pixel-inset), var(--glow-soft);
-        }
+        .summary-card:hover { background-color: var(--surface-2); }
+
+        /* angka penting → aksen */
         .summary-value {
-            color: var(--blue-glow);
+            color: var(--accent);
+            font-family: var(--font-mono);
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }
+        .summary-label {
+            color: var(--txt-muted);
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        /* ---------------- Judul seksi ---------------- */
+        .alert-group-title,
+        .section-title,
+        .modal-header h2 {
+            color: var(--accent);
             font-family: var(--font-pixel);
-            font-size: 20px;
-            line-height: 1.4;
-            text-shadow: 2px 2px 0 #04070f;
-        }
-        .summary-label { letter-spacing: .06em; text-transform: uppercase; }
-
-        /* ---------- Controls ---------- */
-        .button,
-        .talent-search,
-        .talent-filter,
-        .field input,
-        .field select,
-        .field textarea {
-            border: 2px solid #04070f;
-            box-shadow: var(--pixel-inset);
+            font-size: 11px;
+            line-height: 1.8;
+            letter-spacing: .05em;
         }
 
+        /* ---------------- Tombol ---------------- */
         .button {
-            position: relative;
-            overflow: hidden;
             min-height: 40px;
+            border: 0;
+            border-radius: var(--radius-sm);
             font-family: var(--font-pixel);
             font-size: 9px;
             line-height: 1.7;
             letter-spacing: .04em;
-            transition: transform var(--motion-fast), filter var(--motion-fast),
+            transition: background-color var(--motion-fast), color var(--motion-fast),
                         box-shadow var(--motion-fast);
-            box-shadow: var(--pixel-inset), 0 3px 0 #04070f;
         }
-        .button:hover { filter: brightness(1.18); transform: translateY(-2px); }
-        .button:active,
-        .button.block-click { transform: translateY(3px) scale(.985); box-shadow: var(--pixel-inset); }
-        .button-primary { background: var(--blue-bright); color: #04122e; }
-        .button-secondary { background: #24356b; color: #eaf1ff; }
-        .button-success { background: #2f9e6b; color: #04150e; }
-        .button-danger { background: #c4404f; color: #fff; }
 
+        .button-primary {
+            background-color: var(--accent);
+            color: var(--on-accent);
+        }
+        .button-primary:hover { background-color: var(--accent-hover); }
+
+        /* sekunder: transparan + garis aksen lewat inset shadow */
+        .button-secondary {
+            background-color: transparent;
+            color: var(--accent);
+            box-shadow: inset 0 0 0 1px var(--accent);
+        }
+        .button-secondary:hover {
+            color: var(--accent-hover);
+            box-shadow: inset 0 0 0 1px var(--accent-hover);
+        }
+
+        .button-success {
+            background-color: transparent;
+            color: var(--ok);
+            box-shadow: inset 0 0 0 1px var(--ok);
+        }
+        .button-success:hover { background-color: var(--ok-bg); }
+
+        .button-danger {
+            background-color: transparent;
+            color: var(--danger);
+            box-shadow: inset 0 0 0 1px var(--danger);
+        }
+        .button-danger:hover { background-color: var(--danger-bg); }
+
+        /* ---------------- Input ---------------- */
         .talent-search,
         .talent-filter,
         .field input,
         .field select,
         .field textarea {
-            background: var(--bg-sunken);
-            color: var(--text-primary);
+            background-color: var(--bg);
+            color: var(--txt);
+            border: 1px solid var(--line);
+            border-radius: var(--radius-sm);
             outline: none;
-            transition: border-color var(--motion-fast), box-shadow var(--motion-fast),
-                        transform var(--motion-fast);
+            transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
         }
         .talent-search::placeholder,
         .field input::placeholder,
-        .field textarea::placeholder { color: #55689a; }
+        .field textarea::placeholder { color: var(--txt-muted); }
         .talent-search:focus,
         .talent-filter:focus,
         .field input:focus,
         .field select:focus,
         .field textarea:focus {
-            border-color: var(--blue-glow);
-            box-shadow: var(--pixel-inset), 0 0 0 3px rgba(110,226,255,.25);
-            transform: translateY(-1px);
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-ring);
         }
 
-        /* ---------- Talent cards ---------- */
-        .talent-card {
-            transition: transform var(--motion-normal) var(--ease-block),
-                        border-color var(--motion-normal);
+        /* ---------------- Link ---------------- */
+        a,
+        .upload-item-link a {
+            color: var(--accent);
+            text-underline-offset: 3px;
         }
-        .talent-card:hover { transform: translateY(-3px); border-color: var(--blue-deep); }
-        .talent-card-header { border: 0; transition: background var(--motion-fast); }
-        .talent-card-header:hover { background: #172a5e; }
+        a:hover { color: var(--accent-hover); }
+
+        /* ---------------- Kartu talent ---------------- */
+        .talent-card { transition: background-color var(--motion-normal); }
+        .talent-card-header { border: 0; transition: background-color var(--motion-fast); }
         .talent-card.expanded { animation: blockOpen 240ms var(--ease-block); }
         .talent-card.expanded .talent-card-body { animation: revealDown 240ms var(--ease-block); }
-        .talent-card-platform {
-            background: var(--bg-sunken);
-            border: 1px solid #2b4488;
-            color: var(--blue-glow);
-        }
-        .talent-card-quota-number {
-            color: var(--blue-glow);
-            font-family: var(--font-pixel);
-            font-size: 16px;
-            text-shadow: 2px 2px 0 #04070f;
-        }
 
-        /* ---------- Quota + progress ---------- */
-        .quota-box { border: 2px solid #04070f; box-shadow: var(--pixel-inset); }
+        /* angka penting di kartu memakai warna status yang sama
+           dengan strip kiri */
+        .talent-card-quota-number {
+            color: var(--status);
+            font-family: var(--font-mono);
+            font-size: 28px;
+            font-weight: 700;
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .talent-card-quota-label { color: var(--txt-muted); }
+
+        /* ---------------- Kuota & progress ---------------- */
+        .quota-box {
+            border: 1px solid var(--line);
+            background-color: var(--bg);
+        }
         .quota-box.filled {
-            background: var(--blue-bright);
-            box-shadow: var(--pixel-inset), var(--glow-soft);
+            background-color: var(--accent);
+            border-color: var(--accent);
             animation: popBlock 180ms var(--ease-block);
         }
-        .progress-bar { border: 2px solid #04070f; background: var(--bg-sunken); height: 26px; }
-        .progress-bar-fill {
-            background: repeating-linear-gradient(90deg,
-                var(--blue-bright) 0 14px,
-                #2f7fd6 14px 28px);
-            box-shadow: var(--glow-soft);
+        .progress-bar {
+            border: 1px solid var(--line);
+            background-color: var(--bg);
+            height: 24px;
         }
+        .progress-bar-fill { background-color: var(--accent); }
 
-        /* ---------- Alerts, tables, modal ---------- */
-        .alert-item {
-            border: 2px solid currentColor;
-            border-left-width: 8px;
-            box-shadow: 0 3px 0 rgba(0,0,0,.45);
-            animation: revealDown 240ms var(--ease-block);
-        }
-        .alert-group-title {
-            font-family: var(--font-pixel);
-            font-size: 10px;
-            line-height: 1.8;
-            color: var(--blue-glow);
-            letter-spacing: .04em;
-        }
-
+        /* ---------------- Empty state ---------------- */
         .empty-state { min-height: 240px; display: grid; place-content: center; }
         .empty-state-icon {
-            color: var(--blue-bright);
+            color: var(--accent);
             font-family: var(--font-pixel);
+            font-size: 13px;
             animation: floatBlock 2.8s ease-in-out infinite;
         }
-        .empty-state-title { color: #dce9ff; font-family: var(--font-pixel); font-size: 12px; line-height: 1.7; }
-
-        th {
-            color: var(--blue-glow);
-            background: #0a1231;
-            font-family: var(--font-pixel);
-            font-size: 9px;
-            line-height: 1.8;
-            letter-spacing: .03em;
-        }
-        td { border-color: #1d2c5c; }
-        tr:hover td { background: #16234d; }
-
-        .modal { backdrop-filter: blur(3px); background: rgba(4, 8, 22, .72); }
-        .modal.active .modal-content { animation: modalCraft 220ms var(--ease-block); }
-        .modal-close { transition: transform var(--motion-fast), color var(--motion-fast); }
-        .modal-close:hover { transform: rotate(90deg) scale(1.12); color: #ff6b7d; }
-        .modal-header h2,
-        .section-title {
+        .empty-state-title {
+            color: var(--txt);
             font-family: var(--font-pixel);
             font-size: 12px;
             line-height: 1.7;
-            letter-spacing: .03em;
+        }
+        .empty-state-text { color: var(--txt-muted); }
+
+        /* ---------------- Tabel ---------------- */
+        th {
+            color: var(--txt-muted);
+            background-color: var(--surface-2);
+            font-family: var(--font-pixel);
+            font-size: 9px;
+            line-height: 1.8;
+            letter-spacing: .04em;
+            text-align: left;
+        }
+        /* Sel tabel pakai sans, bukan mono: nama panjang harus terbaca.
+           tabular-nums menjaga kolom angka & tanggal tetap lurus. */
+        td {
+            border-color: var(--line);
+            color: var(--txt);
+            font-family: inherit;
+            font-variant-numeric: tabular-nums;
+        }
+        tr:hover td { background-color: var(--surface-2); }
+
+        /* ---------------- Modal ---------------- */
+        .modal { background-color: var(--scrim); backdrop-filter: blur(3px); }
+        .modal.active .modal-content { animation: modalCraft 220ms var(--ease-block); }
+        .modal-close { color: var(--txt-muted); transition: color var(--motion-fast); }
+        .modal-close:hover { color: var(--danger); }
+
+        /* ---------------- Fokus keyboard ---------------- */
+        /* jangan pernah dihilangkan — ini satu-satunya petunjuk posisi
+           bagi yang menavigasi tanpa tetikus */
+        :focus-visible {
+            outline: 2px solid var(--txt);
+            outline-offset: 2px;
+        }
+        .cal-chip:focus-visible {
+            outline: 2px solid var(--txt);
+            outline-offset: 2px;
+            box-shadow: none;
         }
 
-        /* ---------- Motion ---------- */
+        /* ---------------- Motion ---------------- */
         @keyframes blockOpen {
             from { transform: scale(.985); }
             to { transform: scale(1); }
@@ -1447,7 +1504,7 @@
         }
         @keyframes floatBlock {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
+            50% { transform: translateY(-6px); }
         }
         @keyframes modalCraft {
             from { opacity: 0; transform: translateY(18px) scale(.96); }
@@ -1458,19 +1515,30 @@
             100% { transform: scale(1.35); opacity: 0; }
         }
         @keyframes beamPulse {
-            0%, 100% { opacity: .55; }
+            0%, 100% { opacity: .5; }
             50% { opacity: 1; }
         }
 
+        /* ---------------- Layar sempit (375px) ---------------- */
         @media (max-width: 768px) {
-            .container { padding: 28px 10px 24px; }
-            .header { padding: 22px 17px 20px; }
+            .container { padding: 26px 10px 24px; }
+            .header { min-height: 0; padding: 20px 76px 18px 16px; }
             .header::before { display: none; }
-            .pixel-astronaut { width: 62px; right: 12px; bottom: 12px; opacity: .55; }
+            .pixel-astronaut { width: 54px; right: 10px; bottom: 10px; opacity: .5; }
             .header-subtitle { max-width: none; }
             .summary-card { padding: 14px; }
-            .summary-value { font-size: 16px; }
+            .summary-value { font-size: 22px; }
             .tab-button { font-size: 9px; }
+
+            /* kartu boleh menumpuk daripada memaksa scroll mendatar */
+            .alert-item,
+            .talent-card-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .alert-item-action,
+            .talent-card-quota { align-self: flex-start; }
+            .talent-card-quota { align-items: flex-start; text-align: left; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -1491,32 +1559,30 @@
             <svg class="pixel-astronaut" viewBox="0 0 16 20" shape-rendering="crispEdges"
                  role="img" aria-label="Maskot astronot piksel">
                 <!-- backpack -->
-                <rect x="3" y="9" width="1" height="5" fill="#7d94c6"/>
-                <rect x="12" y="9" width="1" height="5" fill="#7d94c6"/>
+                <rect x="3" y="9" width="1" height="5" fill="var(--txt-muted)"/>
+                <rect x="12" y="9" width="1" height="5" fill="var(--txt-muted)"/>
                 <!-- helmet -->
-                <rect x="4" y="1" width="8" height="7" fill="#dbe7ff"/>
-                <rect x="4" y="1" width="8" height="1" fill="#ffffff"/>
+                <rect x="4" y="1" width="8" height="7" fill="var(--txt)"/>
                 <!-- visor -->
-                <rect x="5" y="3" width="6" height="3" fill="#08163f"/>
-                <rect x="6" y="3" width="2" height="1" fill="#6ee2ff"/>
-                <rect x="9" y="5" width="1" height="1" fill="#2f7fd6"/>
+                <rect x="5" y="3" width="6" height="3" fill="var(--bg)"/>
+                <rect x="6" y="3" width="2" height="1" fill="var(--accent)"/>
                 <!-- neck -->
-                <rect x="6" y="8" width="4" height="1" fill="#9fb6e8"/>
+                <rect x="6" y="8" width="4" height="1" fill="var(--txt-muted)"/>
                 <!-- torso -->
-                <rect x="4" y="9" width="8" height="6" fill="#dbe7ff"/>
-                <rect x="6" y="10" width="4" height="3" fill="#0a1c4a"/>
-                <rect x="7" y="11" width="1" height="1" fill="#2f9e6b"/>
-                <rect x="8" y="11" width="1" height="1" fill="#c98524"/>
+                <rect x="4" y="9" width="8" height="6" fill="var(--txt)"/>
+                <rect x="6" y="10" width="4" height="3" fill="var(--bg)"/>
+                <rect x="7" y="11" width="1" height="1" fill="var(--ok)"/>
+                <rect x="8" y="11" width="1" height="1" fill="var(--warn)"/>
                 <!-- arms -->
-                <rect x="2" y="9" width="2" height="5" fill="#c3d4f5"/>
-                <rect x="12" y="9" width="2" height="5" fill="#c3d4f5"/>
-                <rect x="2" y="14" width="2" height="1" fill="#4da6ff"/>
-                <rect x="12" y="14" width="2" height="1" fill="#4da6ff"/>
+                <rect x="2" y="9" width="2" height="5" fill="var(--txt-muted)"/>
+                <rect x="12" y="9" width="2" height="5" fill="var(--txt-muted)"/>
+                <rect x="2" y="14" width="2" height="1" fill="var(--accent)"/>
+                <rect x="12" y="14" width="2" height="1" fill="var(--accent)"/>
                 <!-- legs + boots -->
-                <rect x="4" y="15" width="3" height="4" fill="#c3d4f5"/>
-                <rect x="9" y="15" width="3" height="4" fill="#c3d4f5"/>
-                <rect x="4" y="18" width="3" height="1" fill="#4da6ff"/>
-                <rect x="9" y="18" width="3" height="1" fill="#4da6ff"/>
+                <rect x="4" y="15" width="3" height="4" fill="var(--txt-muted)"/>
+                <rect x="9" y="15" width="3" height="4" fill="var(--txt-muted)"/>
+                <rect x="4" y="18" width="3" height="1" fill="var(--accent)"/>
+                <rect x="9" y="18" width="3" height="1" fill="var(--accent)"/>
             </svg>
         </div>
 
@@ -1569,7 +1635,7 @@
             <div style="margin-bottom: var(--spacing-lg); display: flex; gap: var(--spacing-md); flex-wrap: wrap;">
                 <button class="button button-primary" id="exportBtn">⬇ Unduh Cadangan</button>
                 <button class="button button-secondary" id="importBtn">⬆ Pulihkan Cadangan</button>
-                <button class="button button-success" id="csvNotionBtn">↻ Tarik Riwayat dari Notion (CSV)</button>
+                <button class="button button-secondary" id="csvNotionBtn">↻ Tarik Riwayat dari Notion (CSV)</button>
                 <button class="button button-secondary button-small" id="syncNotionBtn" title="Perlu setelan token di server">Tarik langsung (perlu setelan)</button>
             </div>
             <div class="table-wrapper">
@@ -2214,10 +2280,10 @@
             if (alerts.pendingSlot.length > 0) {
                 html += '<div class="alert-group-title">Jadwal Terlewat, Perlu Dikonfirmasi</div>';
                 alerts.pendingSlot.forEach(a => {
-                    html += '<div class="alert-item behind">' +
+                    html += '<div class="alert-item pending">' +
                         '<div class="alert-item-content">' +
                         '<div class="alert-item-title">' + a.name + '</div>' +
-                        '<div class="alert-item-detail">@' + a.account + ' - ' + a.detail + '</div>' +
+                        '<div class="alert-item-detail"><span class="status-tag">Belum dikonfirmasi</span>@' + a.account + ' - ' + a.detail + '</div>' +
                         '</div></div>';
                 });
             }
@@ -2229,7 +2295,7 @@
                         <div class="alert-item today">
                             <div class="alert-item-content">
                                 <div class="alert-item-title">${alert.name}</div>
-                                <div class="alert-item-detail">${alert.account} • ${alert.detail}</div>
+                                <div class="alert-item-detail"><span class="status-tag">Hari ini</span>${alert.account} • ${alert.detail}</div>
                             </div>
                             <div class="alert-item-action">
                                 <button class="button button-small button-primary" data-quick-record="${alert.talentId}">Catat</button>
@@ -2246,7 +2312,7 @@
                         <div class="alert-item overdue">
                             <div class="alert-item-content">
                                 <div class="alert-item-title">${alert.name}</div>
-                                <div class="alert-item-detail">${alert.account} • ${alert.detail}</div>
+                                <div class="alert-item-detail"><span class="status-tag">Kontrak habis</span>${alert.account} • ${alert.detail}</div>
                             </div>
                             <div class="alert-item-action">
                                 <button class="button button-small button-primary" data-quick-record="${alert.talentId}">Catat</button>
@@ -2263,7 +2329,7 @@
                         <div class="alert-item behind">
                             <div class="alert-item-content">
                                 <div class="alert-item-title">${alert.name}</div>
-                                <div class="alert-item-detail">${alert.account} • ${alert.detail}</div>
+                                <div class="alert-item-detail"><span class="status-tag">Tertinggal</span>${alert.account} • ${alert.detail}</div>
                             </div>
                             <div class="alert-item-action">
                                 <button class="button button-small button-primary" data-quick-record="${alert.talentId}">Catat</button>
@@ -2280,7 +2346,7 @@
                         <div class="alert-item low">
                             <div class="alert-item-content">
                                 <div class="alert-item-title">${alert.name}</div>
-                                <div class="alert-item-detail">${alert.account} • ${alert.detail}</div>
+                                <div class="alert-item-detail"><span class="status-tag">Kuota menipis</span>${alert.account} • ${alert.detail}</div>
                             </div>
                             <div class="alert-item-action">
                                 <button class="button button-small button-primary" data-quick-record="${alert.talentId}">Catat</button>
@@ -2297,7 +2363,7 @@
                         <div class="alert-item soon">
                             <div class="alert-item-content">
                                 <div class="alert-item-title">${alert.name}</div>
-                                <div class="alert-item-detail">${alert.account} • ${alert.detail}</div>
+                                <div class="alert-item-detail"><span class="status-tag">Segera berakhir</span>${alert.account} • ${alert.detail}</div>
                             </div>
                             <div class="alert-item-action">
                                 <button class="button button-small button-primary" data-quick-record="${alert.talentId}">Catat</button>
@@ -2369,6 +2435,7 @@
                 if (daysLeft < 0) statusClass = 'overdue';
                 else if (shouldShowLowQuotaAlert(talent.id)) statusClass = 'low';
                 else if (behind >= state.setelan.behindThreshold) statusClass = 'behind';
+                else if (jadwalLewat > 0) statusClass = 'pending';
 
                 const quotaBoxes = talent.quota <= 24
                     ? renderQuotaBoxes(talent.quota, uploads)
@@ -2393,7 +2460,7 @@
                     : '<div class="text-muted" style="padding: var(--spacing-md);">Belum ada upload tercatat</div>';
 
                 return `
-                    <div class="talent-card" data-talent-id="${talent.id}">
+                    <div class="talent-card ${statusClass}" data-talent-id="${talent.id}">
                         <div class="talent-card-header" role="button" tabindex="0" aria-expanded="false">
                             <div class="talent-card-info">
                                 <div class="talent-card-name">${talent.name}</div>
@@ -2446,7 +2513,7 @@
 
                             <div class="talent-card-actions">
                                 <button class="button button-primary" data-edit-talent="${talent.id}">✎ Ubah</button>
-                                <button class="button button-success" data-quick-record-from-card="${talent.id}">+ Catat Upload</button>
+                                <button class="button button-primary" data-quick-record-from-card="${talent.id}">+ Catat Upload</button>
                                 <button class="button button-secondary" data-contract-pdf="${talent.id}">📄 Surat Kontrak PDF</button>
                                 <button class="button button-danger" data-delete-talent="${talent.id}">🗑 Hapus</button>
                             </div>
