@@ -1011,6 +1011,31 @@
 
         .cal-chip:hover { opacity: 0.85; }
 
+        /* Deretan bulan yang di-scroll. Toolbar menempel di atas supaya tombol
+           dan nama bulan yang sedang terlihat tetap terjangkau. */
+        .cal-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            padding: var(--spacing-sm) 0;
+            background-color: var(--bg-page);
+        }
+
+        .cal-months {
+            display: flex;
+            flex-direction: column;
+            gap: var(--spacing-2xl);
+        }
+
+        .cal-month { scroll-margin-top: 72px; }
+
+        .cal-month-title {
+            font-size: 15px;
+            font-weight: 700;
+            margin-bottom: var(--spacing-sm);
+            color: var(--text-primary);
+        }
+
         .cal-empty {
             padding: var(--spacing-2xl);
             text-align: center;
@@ -1434,6 +1459,27 @@
         }
         .progress-bar-fill { background-color: var(--accent); }
 
+        /* Kelebihan di atas kuota: ditandai, tidak dipotong. */
+        .quota-box.filled.over { background: var(--color-alert); }
+        .progress-bar.is-over { border-color: var(--color-alert); }
+        .quota-caption { margin-top: var(--spacing-sm); font-size: 13px; color: var(--text-secondary); }
+        .quota-over { color: var(--color-alert); }
+        .talent-card-quota.is-over .talent-card-quota-number { color: var(--color-alert); }
+
+        /* Edit kontrak: pratinjau dampak, surat berversi, riwayat perubahan. */
+        .impact-changes { margin: 0 0 var(--spacing-lg) var(--spacing-lg); color: var(--text-secondary); }
+        .impact-changes s { color: var(--text-tertiary); }
+        .impact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
+        .impact-warning, .letter-stale {
+            margin: var(--spacing-sm) 0; padding: var(--spacing-sm) var(--spacing-md);
+            border-left: 4px solid var(--color-alert); background: var(--color-alert-light);
+            color: var(--text-primary); font-size: 13px;
+        }
+        .change-log { margin-bottom: var(--spacing-lg); }
+        .change-log summary { cursor: pointer; font-weight: 600; padding: var(--spacing-sm) 0; color: var(--text-secondary); }
+        .change-log td { text-align: left; vertical-align: top; }
+        @media (max-width: 768px) { .impact-grid { grid-template-columns: 1fr; } }
+
         /* ---------------- Empty state ---------------- */
         .empty-state { min-height: 240px; display: grid; place-content: center; }
         .empty-state-icon {
@@ -1638,6 +1684,7 @@
                 <button class="button button-secondary" id="csvNotionBtn">↻ Tarik Riwayat dari Notion (CSV)</button>
                 <button class="button button-secondary button-small" id="syncNotionBtn" title="Perlu setelan token di server">Tarik langsung (perlu setelan)</button>
             </div>
+            <div id="duplicateNotice"></div>
             <div class="table-wrapper">
                 <table id="dataTable">
                     <thead>
@@ -1868,11 +1915,25 @@
         </div>
     </div>
 
+    <!-- MODAL: Dampak perubahan kontrak ke jadwal. Muncul sebelum disimpan
+         bila kuota, tanggal, atau hari upload diubah. -->
+    <div id="impactModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Tutup">&times;</button>
+            <div class="modal-title">Dampak ke Jadwal</div>
+            <div id="impactBody"></div>
+            <div class="button-group">
+                <button type="button" class="button button-primary" id="impactConfirmBtn">Simpan perubahan</button>
+                <button type="button" class="button button-secondary" id="impactBackBtn">Kembali ke formulir</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: Pencatat Upload Cepat -->
     <div id="recordUploadModal" class="modal">
         <div class="modal-content">
             <button class="modal-close" aria-label="Tutup">&times;</button>
-            <div class="modal-title">Catat Upload</div>
+            <div class="modal-title" id="recordUploadModalTitle">Catat Upload</div>
             <form id="recordUploadForm">
                 <input type="hidden" id="recordUploadTalentId">
                 <div class="field">
@@ -1894,7 +1955,7 @@
                     <input type="url" id="recordUploadLink" placeholder="https://..." required>
                 </div>
                 <div class="button-group">
-                    <button type="submit" class="button button-primary">Simpan Upload</button>
+                    <button type="submit" class="button button-primary" id="recordUploadSubmit">Simpan Upload</button>
                     <button type="button" class="button button-secondary" id="cancelRecordBtn">Batal</button>
                 </div>
             </form>
@@ -1942,6 +2003,7 @@
     <input type="file" id="importFile" accept=".json" style="display: none;">
     <input type="file" id="csvNotionFile" accept=".csv,text/csv" style="display: none;">
 
+    <script src="data/pantau-core.js"></script>
     <script>
         // ============================================================================
         // DATA MANAGEMENT
@@ -2082,43 +2144,43 @@
         // TALENT CALCULATIONS
         // ============================================================================
 
+        // Semua angka talent (sisa, kelebihan, tertinggal, jadwal terlewat,
+        // status slot kalender) datang dari satu fungsi di data/pantau-core.js
+        // agar kartu, tab Hari Ini, dan kalender tidak bisa saling membantah.
+        function metricsFor(talent) {
+            return PantauCore.talentMetrics(talent, state.uploads, todayIso());
+        }
+
+        function metricsById(talentId) {
+            const talent = state.talents.find(t => t.id === talentId);
+            return talent ? metricsFor(talent) : null;
+        }
+
         function getUploadCountForTalent(talentId) {
-            return state.uploads.filter(u => u.talentId === talentId).length;
+            const m = metricsById(talentId);
+            return m ? m.uploaded : 0;
         }
 
         function getRemainingQuota(talentId) {
-            const talent = state.talents.find(t => t.id === talentId);
-            if (!talent) return 0;
-            const uploads = getUploadCountForTalent(talentId);
-            return Math.max(0, talent.quota - uploads);
+            const m = metricsById(talentId);
+            return m ? m.remaining : 0;
         }
 
         function getTargetVideosForToday(talentId) {
-            const talent = state.talents.find(t => t.id === talentId);
-            if (!talent) return 0;
-
-            const total = totalDaysInContract(talent.startDate, talent.endDate);
-            const days = daysIntoContract(talent.startDate);
-            const daysProgress = Math.max(0, Math.min(days, total));
-
-            // Calculate expected videos at this point
-            return Math.floor((daysProgress / total) * talent.quota);
+            const m = metricsById(talentId);
+            return m ? m.target : 0;
         }
 
         function getBehindCount(talentId) {
-            const target = getTargetVideosForToday(talentId);
-            const actual = getUploadCountForTalent(talentId);
-            return Math.max(0, target - actual);
+            const m = metricsById(talentId);
+            return m ? m.behind : 0;
         }
 
         function shouldShowLowQuotaAlert(talentId) {
-            const talent = state.talents.find(t => t.id === talentId);
-            if (!talent) return false;
-
-            const remaining = getRemainingQuota(talentId);
-            const percentRemaining = (remaining / talent.quota) * 100;
-
-            return remaining <= state.setelan.lowQuotaVideos ||
+            const m = metricsById(talentId);
+            if (!m || !m.quota) return false;
+            const percentRemaining = (m.remaining / m.quota) * 100;
+            return m.remaining <= state.setelan.lowQuotaVideos ||
                    percentRemaining <= state.setelan.lowQuotaPercent;
         }
 
@@ -2133,29 +2195,7 @@
         }
 
         function getUploadDaysArray(talent) {
-            if (!talent.uploadDays) return [];
-            try {
-                return talent.uploadDays.split(',').map(d => parseInt(d.trim())).filter(d => !isNaN(d));
-            } catch (e) {
-                return [];
-            }
-        }
-
-        function shouldHaveUploadToday(talentId) {
-            const talent = state.talents.find(t => t.id === talentId);
-            if (!talent) return false;
-
-            const today = new Date();
-            const dayOfWeek = today.getDay();
-            const uploadDays = getUploadDaysArray(talent);
-
-            return uploadDays.includes(dayOfWeek);
-        }
-
-        function hasUploadToday(talentId) {
-            const todayStr = todayIso();
-
-            return state.uploads.some(u => u.talentId === talentId && u.date === todayStr);
+            return PantauCore.uploadDaysOf(talent);
         }
 
         // ============================================================================
@@ -2173,17 +2213,19 @@
             };
 
             for (const talent of state.talents) {
-                // Slot jadwal yang tanggalnya lewat tapi belum disahkan tayang.
-                const lewat = pendingSlots(talent);
-                if (lewat.length) {
+                const m = metricsFor(talent);
+
+                // Slot jadwal yang tanggalnya lewat dan belum terisi upload
+                // apa pun. Angka ini sama dengan "Tertinggal" di kartu.
+                if (m.behind > 0) {
                     alerts.pendingSlot.push({
                         talentId: talent.id, name: talent.name, account: talent.account,
-                        detail: lewat.length + " jadwal belum dikonfirmasi, terakhir " + formatDate(lewat[lewat.length - 1])
+                        detail: m.behind + " jadwal belum terisi upload, terakhir " + formatDate(m.pendingDates[m.pendingDates.length - 1])
                     });
                 }
 
                 // Check: Jadwal upload jatuh hari ini
-                if (shouldHaveUploadToday(talent.id) && !hasUploadToday(talent.id)) {
+                if (m.todaySlotOpen && !m.uploadedToday) {
                     alerts.today.push({
                         talentId: talent.id,
                         name: talent.name,
@@ -2193,24 +2235,23 @@
                 }
 
                 // Check: Kontrak sudah lewat tapi kuota belum habis
-                const daysLeft = daysUntil(talent.endDate);
-                if (daysLeft < 0 && getRemainingQuota(talent.id) > 0) {
+                const daysLeft = m.daysLeft;
+                if (daysLeft < 0 && m.remaining > 0) {
                     alerts.overdue.push({
                         talentId: talent.id,
                         name: talent.name,
                         account: talent.account,
-                        detail: `Kontrak berakhir ${Math.abs(daysLeft)} hari lalu, sisa ${getRemainingQuota(talent.id)} video`
+                        detail: `Kontrak berakhir ${Math.abs(daysLeft)} hari lalu, sisa ${m.remaining} video`
                     });
                 }
 
                 // Check: Tertinggal dari target
-                const behind = getBehindCount(talent.id);
-                if (behind >= state.setelan.behindThreshold) {
+                if (m.behind >= state.setelan.behindThreshold) {
                     alerts.behind.push({
                         talentId: talent.id,
                         name: talent.name,
                         account: talent.account,
-                        detail: `Tertinggal ${behind} dari target (target: ${getTargetVideosForToday(talent.id)}, upload: ${getUploadCountForTalent(talent.id)})`
+                        detail: `Tertinggal ${m.behind} dari target (target: ${m.target}, upload: ${m.uploaded})`
                     });
                 }
 
@@ -2220,12 +2261,14 @@
                         talentId: talent.id,
                         name: talent.name,
                         account: talent.account,
-                        detail: `Sisa ${getRemainingQuota(talent.id)} dari ${talent.quota} video`
+                        detail: m.over
+                            ? `Kuota ${m.quota} terpenuhi, +${m.over} melebihi kuota`
+                            : `Sisa ${m.remaining} dari ${m.quota} video`
                     });
                 }
 
                 // Check: Kontrak mendekati akhir
-                const daysUntilEnd = daysUntil(talent.endDate);
+                const daysUntilEnd = daysLeft;
                 if (daysUntilEnd > 0 && daysUntilEnd <= state.setelan.contractEndingSoon) {
                     alerts.soon.push({
                         talentId: talent.id,
@@ -2422,24 +2465,29 @@
                 return;
             }
 
+            // Kartu yang sedang terbuka tetap terbuka setelah render ulang,
+            // supaya mengedit entri tidak membuat kartunya tertutup sendiri.
+            const terbuka = new Set([...container.querySelectorAll('.talent-card.expanded')].map(el => el.dataset.talentId));
+
             container.innerHTML = filteredTalents.map(talent => {
-                const remaining = getRemainingQuota(talent.id);
-                const uploads = getUploadCountForTalent(talent.id);
-                const daysLeft = daysUntil(talent.endDate);
-                const behind = getBehindCount(talent.id);
+                const m = metricsFor(talent);
                 const dpNow = effectiveDp(talent);
-                const jadwalLewat = pendingSlots(talent).length;
                 const dpOwn = !(talent.dpPercent === '' || talent.dpPercent === undefined || talent.dpPercent === null);
 
+                // Warna status kartu memakai angka yang sama dengan isi kartu.
                 let statusClass = '';
-                if (daysLeft < 0) statusClass = 'overdue';
+                if (m.daysLeft !== null && m.daysLeft < 0) statusClass = 'overdue';
                 else if (shouldShowLowQuotaAlert(talent.id)) statusClass = 'low';
-                else if (behind >= state.setelan.behindThreshold) statusClass = 'behind';
-                else if (jadwalLewat > 0) statusClass = 'pending';
+                else if (m.behind >= state.setelan.behindThreshold) statusClass = 'behind';
+                else if (m.behind > 0) statusClass = 'pending';
 
-                const quotaBoxes = talent.quota <= 24
-                    ? renderQuotaBoxes(talent.quota, uploads)
-                    : renderProgressBar(talent.quota, uploads);
+                const quotaBoxes = (m.quota <= 24
+                    ? renderQuotaBoxes(m.quota, m.uploaded)
+                    : renderProgressBar(m.quota, m.uploaded)) +
+                    `<div class="quota-caption">${m.uploaded} dari ${m.quota} video &middot; ${m.percent}%` +
+                    (m.over ? ` &middot; <strong class="quota-over">+${m.over} melebihi kuota</strong>` : '') +
+                    (m.unscheduled ? ` &middot; <span class="quota-over">${m.unscheduled} kuota tidak muat di jadwal</span>` : '') +
+                    `</div>`;
 
                 const uploads_sorted = [...(state.uploads.filter(u => u.talentId === talent.id) || [])]
                     .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -2453,6 +2501,7 @@
                                 ${upload.link ? `<div class="upload-item-link"><a href="${upload.link}" target="_blank" rel="noopener">${upload.link}</a></div>` : ''}
                             </div>
                             <div class="upload-item-actions">
+                                <button class="button button-small button-secondary" data-edit-upload="${upload.id}" data-edit-upload-talent="${talent.id}">Ubah</button>
                                 <button class="button button-small button-danger" data-delete-upload="${upload.id}">Hapus</button>
                             </div>
                         </div>
@@ -2467,9 +2516,9 @@
                                 <div class="talent-card-account">@${talent.account}</div>
                                 <div class="talent-card-platform">${talent.platform}</div>
                             </div>
-                            <div class="talent-card-quota">
-                                <div class="talent-card-quota-number">${remaining}</div>
-                                <div class="talent-card-quota-label">Sisa</div>
+                            <div class="talent-card-quota${m.over ? ' is-over' : ''}">
+                                <div class="talent-card-quota-number">${m.over ? '+' + m.over : m.remaining}</div>
+                                <div class="talent-card-quota-label">${m.over ? 'Melebihi kuota' : 'Sisa'}</div>
                             </div>
                             <div class="talent-card-toggle">▼</div>
                         </div>
@@ -2490,15 +2539,15 @@
                                 </div>
                                 <div class="field">
                                     <div class="field-label">Hari Upload</div>
-                                    <div class="field-value">${getUploadDaysArray(talent).map(d => getDayName(d)).join(', ') || '-'}</div>
+                                    <div class="field-value">${getUploadDaysArray(talent).map(d => getDayName(d)).join(', ') || '<span class="text-muted">belum diisi &middot; jadwal disebar rata</span>'}</div>
                                 </div>
                                 <div class="field">
-                                    <div class="field-label">Tertinggal</div>
-                                    <div class="field-value">${behind} video dari target</div>
+                                    <div class="field-label">Jadwal sampai hari ini</div>
+                                    <div class="field-value" data-metric="progress">${m.filledDue} dari ${m.target} slot terisi</div>
                                 </div>
                                 <div class="field">
-                                    <div class="field-label">Jadwal terlewat</div>
-                                    <div class="field-value">${jadwalLewat} belum dikonfirmasi</div>
+                                    <div class="field-label">Tertinggal / jadwal terlewat</div>
+                                    <div class="field-value" data-metric="behind">${m.behind ? m.behind + ' slot lewat tanpa upload' : 'Tidak ada'}</div>
                                 </div>
                                 <div class="field">
                                     <div class="field-label">DP</div>
@@ -2511,16 +2560,26 @@
                                 <div class="upload-list">${uploadHistoryHtml}</div>
                             </div>
 
+                            ${renderLetterSection(talent)}
+                            ${renderChangeLog(talent)}
+
                             <div class="talent-card-actions">
-                                <button class="button button-primary" data-edit-talent="${talent.id}">✎ Ubah</button>
+                                <button class="button button-primary" data-edit-talent="${talent.id}">✎ Edit Kontrak</button>
                                 <button class="button button-primary" data-quick-record-from-card="${talent.id}">+ Catat Upload</button>
-                                <button class="button button-secondary" data-contract-pdf="${talent.id}">📄 Surat Kontrak PDF</button>
+                                <button class="button button-secondary" data-contract-pdf="${talent.id}">📄 ${letterButtonLabel(talent)}</button>
                                 <button class="button button-danger" data-delete-talent="${talent.id}">🗑 Hapus</button>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            container.querySelectorAll('.talent-card').forEach(card => {
+                if (terbuka.has(card.dataset.talentId)) {
+                    card.classList.add('expanded');
+                    card.querySelector('.talent-card-header').setAttribute('aria-expanded', 'true');
+                }
+            });
 
             // Event listeners
             document.querySelectorAll('.talent-card-header').forEach(header => {
@@ -2548,26 +2607,94 @@
                 btn.addEventListener('click', () => deleteUpload(btn.dataset.deleteUpload));
             });
 
+            document.querySelectorAll('[data-edit-upload]').forEach(btn => {
+                btn.addEventListener('click', () => openRecordUploadModal(btn.dataset.editUploadTalent, btn.dataset.editUpload));
+            });
+
             document.querySelectorAll('[data-quick-record-from-card]').forEach(btn => {
                 btn.addEventListener('click', () => openRecordUploadModal(btn.dataset.quickRecordFromCard));
             });
 
         }
 
+        function formatWaktu(isoStr) {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return isoStr || '';
+            return d.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+        }
+
+        function letterButtonLabel(talent) {
+            const letters = talent.letters || [];
+            if (!letters.length) return 'Buat Surat Kontrak';
+            if (talent.letterStale) return 'Buat Surat v' + (letters.length + 1);
+            return 'Unduh Surat v' + letters.length;
+        }
+
+        function renderLetterSection(talent) {
+            const letters = talent.letters || [];
+            if (!letters.length) return '';
+            const stale = talent.letterStale
+                ? `<div class="letter-stale" data-letter-stale>Surat perlu dibuat ulang: kontrak berubah sejak v${letters.length}.</div>`
+                : '';
+            const daftar = letters.slice().reverse().map(l => `
+                <div class="upload-item">
+                    <div class="upload-item-info">
+                        <div class="upload-item-date">Versi ${l.version}${l.version === letters.length && !talent.letterStale ? ' &middot; berlaku' : ''}</div>
+                        <div class="upload-item-title">Dibuat ${escapeHtml(formatWaktu(l.createdAt))}</div>
+                    </div>
+                    <div class="upload-item-actions">
+                        <button type="button" class="button button-small button-secondary" data-letter-version="${talent.id}|${l.version}">Unduh v${l.version}</button>
+                    </div>
+                </div>`).join('');
+            return `
+                <div class="upload-history">
+                    <div class="upload-history-title">Surat Kontrak</div>
+                    ${stale}
+                    <div class="upload-list">${daftar}</div>
+                </div>`;
+        }
+
+        // Riwayat perubahan kontrak, terbaru di atas. Disimpan per talent dan
+        // ikut di berkas cadangan, untuk rujukan bila ada selisih paham.
+        function renderChangeLog(talent) {
+            const log = talent.changeLog || [];
+            if (!log.length) return '';
+            const baris = log.slice().reverse().map(c => `
+                <tr>
+                    <td>${escapeHtml(formatWaktu(c.at))}</td>
+                    <td>${escapeHtml(c.label || c.field)}</td>
+                    <td>${escapeHtml(c.from || '(kosong)')} &rarr; <strong>${escapeHtml(c.to || '(kosong)')}</strong></td>
+                </tr>`).join('');
+            return `
+                <details class="change-log">
+                    <summary>Riwayat perubahan kontrak (${log.length})</summary>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead><tr><th>Waktu</th><th>Kolom</th><th>Lama &rarr; Baru</th></tr></thead>
+                            <tbody>${baris}</tbody>
+                        </table>
+                    </div>
+                </details>`;
+        }
+
+        // Kelebihan di atas kuota digambar sebagai kotak tambahan bertanda,
+        // bukan dipotong, supaya "103%" tidak tampil berdampingan dengan kotak
+        // yang kelihatannya pas penuh.
         function renderQuotaBoxes(total, filled) {
             let html = '<div class="quota-boxes">';
-            for (let i = 0; i < total; i++) {
-                html += `<div class="quota-box ${i < filled ? 'filled' : ''}"></div>`;
+            for (let i = 0; i < Math.max(total, filled); i++) {
+                const cls = i >= total ? 'filled over' : i < filled ? 'filled' : '';
+                html += `<div class="quota-box ${cls}"></div>`;
             }
             html += '</div>';
             return html;
         }
 
         function renderProgressBar(total, filled) {
-            const percentage = Math.round((filled / total) * 100);
+            const percentage = total ? Math.round((filled / total) * 100) : 0;
             return `
-                <div class="progress-bar">
-                    <div class="progress-bar-fill" style="width: ${percentage}%">${percentage}%</div>
+                <div class="progress-bar${percentage > 100 ? ' is-over' : ''}">
+                    <div class="progress-bar-fill" style="width: ${Math.min(100, percentage)}%">${percentage}%</div>
                 </div>
             `;
         }
@@ -2586,9 +2713,35 @@
                     <td>${talent.endDate}</td>
                     <td>${talent.quota}</td>
                     <td>${formatCurrency(talent.value)}</td>
-                    <td><button type="button" class="button button-small button-primary" data-contract-pdf="${talent.id}">📄 Buat PDF</button></td>
+                    <td>
+                        <button type="button" class="button button-small button-primary" data-contract-pdf="${talent.id}">📄 ${letterButtonLabel(talent)}</button>
+                        ${talent.letterStale ? '<div class="letter-stale">perlu dibuat ulang</div>' : ''}
+                    </td>
                 </tr>
             `).join('');
+
+            // Entri yang tercatat dua kali (ID Notion sama, atau talent,
+            // tanggal, judul, dan tautan yang semuanya sama). Tidak dihapus
+            // otomatis: ditampilkan dulu, dibersihkan hanya lewat tombol.
+            const ganda = PantauCore.findDuplicateUploads(state.uploads);
+            const notice = document.getElementById('duplicateNotice');
+            notice.innerHTML = ganda.length
+                ? `<div class="alert-item low" style="margin-bottom: var(--spacing-lg);">
+                        <div class="alert-item-content">
+                            <div class="alert-item-title">${ganda.length} entri upload tercatat ganda</div>
+                            <div class="alert-item-detail">Salinan ini ikut terhitung ke kuota. Salinan pertama tiap kelompok dipertahankan.</div>
+                        </div>
+                        <div class="alert-item-action"><button type="button" class="button button-small button-danger" id="cleanDuplicatesBtn">Bersihkan</button></div>
+                   </div>`
+                : '';
+            const btn = document.getElementById('cleanDuplicatesBtn');
+            if (btn) btn.addEventListener('click', () => {
+                if (!confirm('Hapus ' + ganda.length + ' entri ganda? Salinan pertama tiap kelompok tetap tersimpan.')) return;
+                const buang = new Set(ganda.map(u => u.id));
+                state.uploads = state.uploads.filter(u => !buang.has(u.id));
+                saveData();
+                render();
+            });
         }
 
         // ============================================================================
@@ -2692,7 +2845,6 @@
             const dpValue = dpRaw === '' || isNaN(dpNum) ? '' : Math.max(0, Math.min(100, dpNum));
 
             const talentData = {
-                id: talentId || 'talent-' + Date.now(),
                 name: document.getElementById('talentName').value,
                 account: document.getElementById('talentAccount').value,
                 platform: document.getElementById('talentPlatform').value,
@@ -2711,17 +2863,80 @@
                 notionName: document.getElementById('talentNotionName').value.trim()
             };
 
-            if (talentId) {
-                const idx = state.talents.findIndex(t => t.id === talentId);
-                state.talents[idx] = talentData;
-            } else {
-                state.talents.push(talentData);
+            if (!talentId) {
+                state.talents.push(Object.assign({ id: 'talent-' + Date.now() }, talentData));
+                saveData();
+                render();
+                closeTalentModal();
+                return;
             }
 
+            // Edit: field lain milik talent (riwayat perubahan, surat, paku
+            // jadwal) dipertahankan; perubahan jadwal ditunjukkan dulu.
+            const lama = state.talents.find(t => t.id === talentId);
+            const rencana = PantauCore.planContractEdit(lama, talentData, state.uploads, todayIso(), new Date().toISOString());
+            if (!rencana.changes.length) { closeTalentModal(); return; }
+            if (rencana.scheduleChanged) { bukaDampakJadwal(rencana); return; }
+            terapkanEditKontrak(rencana);
+        });
+
+        function terapkanEditKontrak(rencana) {
+            const idx = state.talents.findIndex(t => t.id === rencana.talent.id);
+            if (idx === -1) return;
+            state.talents[idx] = rencana.talent;
             saveData();
             render();
             closeTalentModal();
+        }
+
+        // ---- Pratinjau dampak perubahan kontrak ke jadwal ------------------
+        let rencanaTertunda = null;
+
+        function daftarTanggal(list) {
+            if (!list.length) return '<span class="text-muted">tidak ada</span>';
+            const tampil = list.slice(0, 12).map(formatDate).join(', ');
+            return tampil + (list.length > 12 ? ' &hellip; +' + (list.length - 12) + ' lagi' : '');
+        }
+
+        function bukaDampakJadwal(rencana) {
+            rencanaTertunda = rencana;
+            const perubahan = rencana.changes
+                .filter(c => PantauCore.SCHEDULE_FIELDS.indexOf(c.field) !== -1)
+                .map(c => `<li>${escapeHtml(c.label)}: <s>${escapeHtml(c.from || '(kosong)')}</s> &rarr; <strong>${escapeHtml(c.to || '(kosong)')}</strong></li>`)
+                .join('');
+            document.getElementById('impactBody').innerHTML = `
+                <ul class="impact-changes">${perubahan}</ul>
+                <div class="impact-grid">
+                    <div class="summary-card"><span class="summary-value" data-impact="added">+${rencana.added.length}</span><span class="summary-label">slot ditambah</span></div>
+                    <div class="summary-card"><span class="summary-value" data-impact="removed">&minus;${rencana.removed.length}</span><span class="summary-label">slot dihapus</span></div>
+                    <div class="summary-card"><span class="summary-value" data-impact="kept">${rencana.kept}</span><span class="summary-label">slot lewat/terisi tetap</span></div>
+                </div>
+                <div class="field"><div class="field-label">Ditambah</div><div class="field-value">${daftarTanggal(rencana.added)}</div></div>
+                <div class="field"><div class="field-label">Dihapus</div><div class="field-value">${daftarTanggal(rencana.removed)}</div></div>
+                ${rencana.warnings.map(w => `<div class="impact-warning">${escapeHtml(w)}</div>`).join('')}
+                <p class="form-section-note">Hanya slot mendatang yang belum terisi yang berubah. Riwayat upload tidak disentuh.</p>
+            `;
+            document.getElementById('impactModal').classList.add('active');
+        }
+
+        function tutupDampakJadwal() {
+            document.getElementById('impactModal').classList.remove('active');
+            rencanaTertunda = null;
+        }
+
+        document.getElementById('impactConfirmBtn').addEventListener('click', () => {
+            const r = rencanaTertunda;
+            tutupDampakJadwal();
+            if (r) terapkanEditKontrak(r);
         });
+        document.getElementById('impactBackBtn').addEventListener('click', tutupDampakJadwal);
+        document.querySelector('#impactModal .modal-close').addEventListener('click', tutupDampakJadwal);
+
+        function escapeHtml(v) {
+            return String(v === undefined || v === null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
 
         function closeTalentModal() {
             document.getElementById('talentModal').classList.remove('active');
@@ -2731,35 +2946,49 @@
         document.querySelector('#talentModal .modal-close').addEventListener('click', closeTalentModal);
 
         // Record Upload Modal
-        function openRecordUploadModal(talentId) {
+        // Dipakai untuk mencatat upload baru dan untuk mengedit entri yang ada.
+        // Saat mengedit, tautan boleh kosong: riwayat dari Notion atau dari
+        // kalender memang sering belum punya tautan.
+        function openRecordUploadModal(talentId, uploadId = null) {
             const talent = state.talents.find(t => t.id === talentId);
             if (!talent) return;
+            const ada = uploadId ? state.uploads.find(u => u.id === uploadId) : null;
+            const form = document.getElementById('recordUploadForm');
 
             document.getElementById('recordUploadTalentId').value = talentId;
             document.getElementById('recordUploadTalentName').textContent = talent.name;
+            document.getElementById('recordUploadModalTitle').textContent = ada ? 'Ubah Entri Upload' : 'Catat Upload';
+            document.getElementById('recordUploadSubmit').textContent = ada ? 'Simpan Perubahan' : 'Simpan Upload';
 
-            // Set today as default date
-            const today = todayIso();
-            document.getElementById('recordUploadDate').value = today;
-            document.getElementById('recordUploadTitle').value = '';
-            document.getElementById('recordUploadLink').value = '';
+            document.getElementById('recordUploadDate').value = ada ? ada.date : todayIso();
+            document.getElementById('recordUploadTitle').value = ada ? (ada.title || '') : '';
+            document.getElementById('recordUploadLink').value = ada ? (ada.link || '') : '';
+            document.getElementById('recordUploadLink').required = !ada;
 
+            if (ada) form.dataset.uploadId = ada.id; else delete form.dataset.uploadId;
             document.getElementById('recordUploadModal').classList.add('active');
         }
 
         document.getElementById('recordUploadForm').addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const talentId = document.getElementById('recordUploadTalentId').value;
-            const upload = {
-                id: 'upload-' + Date.now(),
-                talentId: talentId,
+            const form = document.getElementById('recordUploadForm');
+            const isian = {
                 date: document.getElementById('recordUploadDate').value,
-                title: document.getElementById('recordUploadTitle').value,
-                link: document.getElementById('recordUploadLink').value
+                title: document.getElementById('recordUploadTitle').value.trim(),
+                link: document.getElementById('recordUploadLink').value.trim()
             };
 
-            state.uploads.push(upload);
+            const ada = form.dataset.uploadId ? state.uploads.find(u => u.id === form.dataset.uploadId) : null;
+            if (ada) {
+                Object.assign(ada, isian);
+            } else {
+                state.uploads.push(Object.assign({
+                    id: 'upload-' + Date.now(),
+                    talentId: document.getElementById('recordUploadTalentId').value
+                }, isian));
+            }
+
             saveData();
             render();
             closeRecordUploadModal();
@@ -2794,6 +3023,10 @@
         }
 
         function deleteUpload(uploadId) {
+            const ada = state.uploads.find(u => u.id === uploadId);
+            if (!ada) return;
+            const ket = formatDate(ada.date) + (ada.title ? ' — ' + ada.title : '') + (ada.link ? '\n' + ada.link : '');
+            if (!confirm('Hapus entri upload ini?\n\n' + ket + '\n\nKuota talent akan bertambah satu.')) return;
             state.uploads = state.uploads.filter(u => u.id !== uploadId);
             saveData();
             render();
@@ -2821,87 +3054,66 @@
 
         // Jadwal upload diturunkan dari kontrak, tidak disimpan. Bila hari upload
         // diisi, dipakai hari itu; bila kosong, kuota disebar rata sepanjang masa
-        // kontrak. Mengubah kuota atau periode otomatis mengubah jadwalnya.
+        // kontrak. Algoritmanya kini tinggal di data/pantau-core.js.
         function buildSchedule(talent) {
-            const slots = [];
-            const quota = parseInt(talent.quota, 10) || 0;
-            if (!quota || !talent.startDate || !talent.endDate) return slots;
-
-            const start = new Date(talent.startDate + 'T00:00:00');
-            const end = new Date(talent.endDate + 'T00:00:00');
-            if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) return slots;
-
-            const days = getUploadDaysArray(talent);
-
-            if (days.length) {
-                const d = new Date(start);
-                while (d <= end && slots.length < quota) {
-                    if (days.indexOf(d.getDay()) !== -1) slots.push(isoOf(d));
-                    d.setDate(d.getDate() + 1);
-                }
-            } else {
-                const span = Math.floor((end - start) / 86400000) + 1;
-                for (let i = 0; i < quota; i++) {
-                    const d = new Date(start);
-                    d.setDate(d.getDate() + Math.round((i + 0.5) * span / quota - 0.5));
-                    slots.push(isoOf(d));
-                }
-            }
-            return slots;
+            return PantauCore.buildSchedule(talent);
         }
 
         function uploadOn(talentId, dateStr) {
             return state.uploads.find(u => u.talentId === talentId && u.date === dateStr);
         }
 
-        // Slot yang tanggalnya sudah lewat tapi belum ada catatan uploadnya.
+        // Slot yang tanggalnya sudah lewat dan belum terisi upload apa pun.
         function pendingSlots(talent) {
-            const hari = todayIso();
-            return buildSchedule(talent).filter(s => s <= hari && !uploadOn(talent.id, s));
+            return metricsFor(talent).pendingDates;
         }
 
 
-        function renderKalenderTab() {
-            if (!calCursor) {
-                const n = new Date();
-                calCursor = { y: n.getFullYear(), m: n.getMonth() };
-            }
+        // Kalender digambar sebagai deretan bulan yang bisa di-scroll: mulai
+        // dari bulan `calCursor`, terus sampai bulan kontrak terakhir berakhir
+        // (paling sedikit 3 bulan, paling banyak 12). Tombol bulan lalu/depan
+        // menggulir ke bulan itu; bila belum tergambar, deretannya diperluas.
+        const CAL_MIN_BULAN = 3;
+        const CAL_MAX_BULAN = 12;
+        let calJumlahBulan = CAL_MIN_BULAN;
 
-            const first = new Date(calCursor.y, calCursor.m, 1);
-            document.getElementById('calTitle').textContent =
-                first.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        function bulanKe(cursor, n) {
+            const d = new Date(cursor.y, cursor.m + n, 1);
+            return { y: d.getFullYear(), m: d.getMonth() };
+        }
 
-            const container = document.getElementById('kalenderContainer');
+        // Bulan berjalan menurut tanggal WIB, sama dengan acuan "hari ini" lain.
+        function bulanHariIni() {
+            const [y, m] = todayIso().split('-').map(Number);
+            return { y, m: m - 1 };
+        }
 
-            if (state.talents.length === 0) {
-                container.innerHTML = '<div class="cal-empty">Belum ada talent, jadi belum ada jadwal yang bisa ditampilkan.</div>';
-                return;
-            }
+        function kunciBulan(b) {
+            return b.y + '-' + String(b.m + 1).padStart(2, '0');
+        }
 
-            const byDate = {};
-            const push = (date, item) => { (byDate[date] = byDate[date] || []).push(item); };
-            const hari = todayIso();
+        // Banyak bulan sampai kontrak terakhir berakhir, dihitung dari cursor.
+        function bulanSampaiKontrakTerakhir(cursor) {
+            const akhir = state.talents.map(t => t.endDate || '').filter(Boolean).sort().pop();
+            if (!akhir) return CAL_MIN_BULAN;
+            const [y, m] = akhir.split('-').map(Number);
+            return (y - cursor.y) * 12 + (m - 1 - cursor.m) + 1;
+        }
 
-            state.talents.forEach(t => {
-                buildSchedule(t).forEach(s => {
-                    if (!uploadOn(t.id, s)) {
-                        push(s, { t: t, status: s <= hari ? 'pending' : 'future' });
-                    }
-                });
-            });
-            state.uploads.forEach(u => {
-                const t = state.talents.find(x => x.id === u.talentId);
-                if (t) push(u.date, { t: t, status: 'done' });
-            });
-
+        function renderBulan(b, byDate, hari) {
+            const first = new Date(b.y, b.m, 1);
+            const judul = first.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
             const namaHari = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-            let html = '<div class="cal-scroll"><div class="cal-grid">';
+            const urut = { pending: 0, done: 1, future: 2 };
+
+            let html = '<section class="cal-month" data-cal-month="' + kunciBulan(b) + '" data-cal-label="' + judul + '">' +
+                '<h3 class="cal-month-title">' + judul + '</h3>' +
+                '<div class="cal-scroll"><div class="cal-grid">';
             namaHari.forEach(n => { html += '<div class="cal-dayname">' + n + '</div>'; });
 
             const pad = first.getDay();
-            const jumlahHari = new Date(calCursor.y, calCursor.m + 1, 0).getDate();
+            const jumlahHari = new Date(b.y, b.m + 1, 0).getDate();
             const totalSel = Math.ceil((pad + jumlahHari) / 7) * 7;
-            const urut = { pending: 0, done: 1, future: 2 };
 
             for (let i = 0; i < totalSel; i++) {
                 const tgl = i - pad + 1;
@@ -2909,8 +3121,8 @@
                     html += '<div class="cal-cell muted"></div>';
                     continue;
                 }
-                const iso = calCursor.y + '-' + String(calCursor.m + 1).padStart(2, '0') + '-' + String(tgl).padStart(2, '0');
-                const items = (byDate[iso] || []).sort((a, b) => urut[a.status] - urut[b.status]);
+                const iso = kunciBulan(b) + '-' + String(tgl).padStart(2, '0');
+                const items = (byDate[iso] || []).sort((x, y) => urut[x.status] - urut[y.status]);
 
                 html += '<div class="cal-cell' + (iso === hari ? ' today' : '') + '">';
                 html += '<div class="cal-date">' + tgl + '</div>';
@@ -2924,9 +3136,69 @@
                 });
                 html += '</div>';
             }
-
-            container.innerHTML = html + '</div></div>';
+            return html + '</div></div></section>';
         }
+
+        function renderKalenderTab() {
+            if (!calCursor) calCursor = bulanHariIni();
+
+            const container = document.getElementById('kalenderContainer');
+
+            if (state.talents.length === 0) {
+                document.getElementById('calTitle').textContent =
+                    new Date(calCursor.y, calCursor.m, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+                container.innerHTML = '<div class="cal-empty">Belum ada talent, jadi belum ada jadwal yang bisa ditampilkan.</div>';
+                return;
+            }
+
+            const byDate = {};
+            const push = (date, item) => { (byDate[date] = byDate[date] || []).push(item); };
+            const hari = todayIso();
+
+            // Slot yang sudah terisi upload tidak digambar lagi: uploadnya
+            // sendiri muncul sebagai chip "sudah tayang" di tanggal tayangnya.
+            state.talents.forEach(t => {
+                metricsFor(t).slots.forEach(s => {
+                    if (s.status === 'done') return;
+                    push(s.date, { t: t, status: s.status === 'future' ? 'future' : 'pending' });
+                });
+            });
+            state.uploads.forEach(u => {
+                const t = state.talents.find(x => x.id === u.talentId);
+                if (t) push(u.date, { t: t, status: 'done' });
+            });
+
+            const jumlah = Math.min(CAL_MAX_BULAN,
+                Math.max(calJumlahBulan, CAL_MIN_BULAN, bulanSampaiKontrakTerakhir(calCursor)));
+            let html = '';
+            for (let i = 0; i < jumlah; i++) html += renderBulan(bulanKe(calCursor, i), byDate, hari);
+
+            container.innerHTML = '<div class="cal-months">' + html + '</div>';
+            perbaruiJudulKalender();
+        }
+
+        // Judul di toolbar mengikuti bulan yang sedang terlihat saat di-scroll.
+        function bulanTerlihat() {
+            const months = [...document.querySelectorAll('#kalenderContainer [data-cal-month]')];
+            if (!months.length) return null;
+            const toolbar = document.querySelector('.cal-toolbar');
+            const batas = (toolbar ? toolbar.getBoundingClientRect().bottom : 0) + 8;
+            let aktif = months[0];
+            months.forEach(el => { if (el.getBoundingClientRect().top <= batas) aktif = el; });
+            return aktif;
+        }
+
+        function perbaruiJudulKalender() {
+            const el = bulanTerlihat();
+            if (el) document.getElementById('calTitle').textContent = el.dataset.calLabel;
+        }
+
+        let calScrollJadwal = false;
+        window.addEventListener('scroll', () => {
+            if (calScrollJadwal || !document.getElementById('kalender').classList.contains('active')) return;
+            calScrollJadwal = true;
+            window.requestAnimationFrame(() => { calScrollJadwal = false; perbaruiJudulKalender(); });
+        }, { passive: true });
 
         // Klik pada chip kalender membuka detail. Tindakan yang mengubah data
         // ada di dalam modal, masing-masing dengan tombolnya sendiri, supaya
@@ -3021,22 +3293,41 @@
         document.getElementById('calDetailCloseBtn').addEventListener('click', tutupCalDetail);
         document.querySelector('#calDetailModal .modal-close').addEventListener('click', tutupCalDetail);
 
+        // Menggulir ke satu bulan. Bila bulan itu belum tergambar, deretan
+        // diperluas (ke depan) atau titik awalnya dimundurkan (ke belakang).
+        function gulirKeBulan(target) {
+            const selisih = (target.y - calCursor.y) * 12 + (target.m - calCursor.m);
+            if (selisih < 0) {
+                calJumlahBulan = Math.min(CAL_MAX_BULAN, calJumlahBulan - selisih);
+                calCursor = { y: target.y, m: target.m };
+                renderKalenderTab();
+            } else if (!document.querySelector('[data-cal-month="' + kunciBulan(target) + '"]')) {
+                calJumlahBulan = Math.min(CAL_MAX_BULAN, selisih + 1);
+                if (selisih + 1 > CAL_MAX_BULAN) calCursor = bulanKe(target, -(CAL_MAX_BULAN - 1));
+                renderKalenderTab();
+            }
+            const el = document.querySelector('[data-cal-month="' + kunciBulan(target) + '"]');
+            if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            document.getElementById('calTitle').textContent = el ? el.dataset.calLabel : '';
+        }
+
+        function bulanAcuan() {
+            const el = bulanTerlihat();
+            if (!el) return calCursor;
+            const [y, m] = el.dataset.calMonth.split('-').map(Number);
+            return { y, m: m - 1 };
+        }
+
         document.getElementById('calPrev').addEventListener('click', () => {
-            calCursor.m--;
-            if (calCursor.m < 0) { calCursor.m = 11; calCursor.y--; }
-            renderKalenderTab();
+            gulirKeBulan(bulanKe(bulanAcuan(), -1));
         });
 
         document.getElementById('calNext').addEventListener('click', () => {
-            calCursor.m++;
-            if (calCursor.m > 11) { calCursor.m = 0; calCursor.y++; }
-            renderKalenderTab();
+            gulirKeBulan(bulanKe(bulanAcuan(), 1));
         });
 
         document.getElementById('calToday').addEventListener('click', () => {
-            const n = new Date();
-            calCursor = { y: n.getFullYear(), m: n.getMonth() };
-            renderKalenderTab();
+            gulirKeBulan(bulanHariIni());
         });
 
 
@@ -3141,16 +3432,46 @@
             return y + 10;
         }
 
+        function pdfSiap() {
+            if (window.jspdf && window.jspdf.jsPDF) return true;
+            alert('Pustaka PDF belum termuat.\n\nFitur surat kontrak butuh koneksi internet saat halaman pertama kali dibuka. Sambungkan internet, muat ulang halaman, lalu coba lagi.');
+            return false;
+        }
+
+        // Surat berversi. Belum pernah dibuat, atau kontrak sudah berubah sejak
+        // versi terakhir → versi baru dibuat. Selain itu versi terakhir diunduh
+        // ulang apa adanya. Versi lama tidak pernah dihapus.
         function generateContractPDF(talentId) {
-            if (!window.jspdf || !window.jspdf.jsPDF) {
-                alert('Pustaka PDF belum termuat.\n\nFitur surat kontrak butuh koneksi internet saat halaman pertama kali dibuka. Sambungkan internet, muat ulang halaman, lalu coba lagi.');
+            const talent = state.talents.find(t => t.id === talentId);
+            if (!talent || !pdfSiap()) return;
+
+            const letters = talent.letters || [];
+            if (letters.length && !talent.letterStale) {
+                cetakSurat(letters[letters.length - 1]);
                 return;
             }
 
-            const talent = state.talents.find(t => t.id === talentId);
-            if (!talent) return;
+            const hasil = PantauCore.createLetterVersion(
+                talent, state.setelan, TEXT_SETTINGS, effectiveDp(talent), new Date().toISOString());
+            if (!cetakSurat(hasil.letter)) return;
 
-            const s = state.setelan;
+            const idx = state.talents.findIndex(t => t.id === talentId);
+            state.talents[idx] = hasil.talent;
+            saveData();
+            render();
+        }
+
+        function unduhVersiSurat(talentId, version) {
+            const talent = state.talents.find(t => t.id === talentId);
+            const letter = talent && (talent.letters || []).find(l => String(l.version) === String(version));
+            if (letter && pdfSiap()) cetakSurat(letter);
+        }
+
+        // Menggambar surat dari salinan isi satu versi. Mengembalikan false
+        // bila dibatalkan di konfirmasi data yang belum lengkap.
+        function cetakSurat(letter) {
+            const talent = letter.data;
+            const s = Object.assign({}, state.setelan, letter.setelan);
 
             const missing = [];
             if (!talent.address) missing.push('Alamat talent');
@@ -3161,7 +3482,7 @@
             if (missing.length && !confirm(
                 'Data berikut belum diisi:\n\n' + missing.map(m => '  • ' + m).join('\n') +
                 '\n\nSurat tetap dibuat, bagian kosong ditandai "' + PLACEHOLDER + '".\nLanjutkan?'
-            )) return;
+            )) return false;
 
             const { jsPDF } = window.jspdf;
             // compress: tanpa ini logo tersimpan mentah dan berkasnya jadi belasan
@@ -3329,7 +3650,8 @@
             // --- Simpan --------------------------------------------------------
             const safe = str => String(str || '').replace(/[\\/:*?"<>|]/g, '-').trim();
             doc.setProperties({ title: `Surat Kontrak ${talentFullName}` });
-            doc.save(`Surat Kontrak - ${safe(talentFullName)} - ${safe(talent.account)}.pdf`);
+            doc.save(`Surat Kontrak - ${safe(talentFullName)} - ${safe(talent.account)} - v${letter.version}.pdf`);
+            return true;
         }
 
         // ============================================================================
@@ -3339,46 +3661,31 @@
         const SYNC_KEY_STORE = 'pantau-talent-sync-key';
 
         // Hanya menambah riwayat yang belum tercatat. Tidak pernah menghapus,
-        // dan catatan yang sudah Anda sahkan sendiri tidak disentuh.
+        // dan catatan yang sudah Anda sahkan sendiri tidak disentuh. Keputusan
+        // baris mana yang baru ada di PantauCore.planNotionImport: kuncinya ID
+        // halaman Notion, atau talent + tanggal bila ID tidak ada, sehingga
+        // impor ulang berkas yang sama menghasilkan nol entri baru.
         function terapkanRiwayatNotion(baris) {
-            const hari = todayIso();
-            const laporan = [];
-            let tambah = 0;
+            const rencana = PantauCore.planNotionImport(state.talents, state.uploads, baris, todayIso());
 
-            state.talents.forEach(t => {
-                const kunci = String(t.notionName || t.account || '').trim().toLowerCase();
-                if (!kunci) return;
-
-                let baru = 0;
-                baris.forEach(b => {
-                    if (String(b.nama).trim().toLowerCase() !== kunci) return;
-                    if (b.tgl < t.startDate || b.tgl > t.endDate || b.tgl > hari) return;
-                    if (uploadOn(t.id, b.tgl)) return;
-                    state.uploads.push({
-                        id: 'upload-notion-' + t.id + '-' + b.tgl,
-                        talentId: t.id, date: b.tgl,
-                        title: 'Dari Notion Content Calendar', link: ''
-                    });
-                    baru++; tambah++;
-                });
-                if (baru) laporan.push('  ' + t.account + ': +' + baru);
+            rencana.klaim.forEach(k => {
+                const u = state.uploads.find(x => x.id === k.uploadId);
+                if (u) u.notionId = k.notionId;
             });
+            rencana.baru.forEach(u => state.uploads.push(u));
 
-            if (tambah) { saveData(); render(); }
+            const tambah = rencana.baru.length;
+            if (tambah || rencana.klaim.length) { saveData(); render(); }
 
-            const namaTalent = state.talents.map(t => String(t.notionName || t.account || '').trim().toLowerCase());
-            const asing = [];
-            baris.forEach(b => {
-                const n = String(b.nama).trim();
-                if (namaTalent.indexOf(n.toLowerCase()) === -1 && asing.indexOf(n) === -1) asing.push(n);
-            });
-
+            const laporan = Object.keys(rencana.laporan).map(k => '  ' + k + ': +' + rencana.laporan[k]);
             alert(
                 (tambah ? tambah + ' riwayat baru ditambahkan:\n' + laporan.join('\n')
                         : 'Tidak ada riwayat baru. Semua sudah tercatat.') +
-                (asing.length ? '\n\nNama di Notion yang belum punya talent di sini:\n  ' +
-                    asing.slice(0, 15).join(', ') : '')
+                (rencana.duplikat ? '\n\n' + rencana.duplikat + ' baris sudah pernah diimpor, dilewati.' : '') +
+                (rencana.asing.length ? '\n\nNama di Notion yang belum punya talent di sini:\n  ' +
+                    rencana.asing.slice(0, 15).join(', ') : '')
             );
+            return rencana;
         }
 
         async function tarikDariNotion() {
@@ -3425,98 +3732,25 @@
         // UNGGAH CSV DARI NOTION
         // ============================================================================
 
-        // Notion mengekspor tanggal dalam beberapa bentuk tergantung bahasa dan
-        // setelan akun, jadi keempatnya diterima.
-        const BULAN_NAMA = {
-            january:1, february:2, march:3, april:4, may:5, june:6, july:7,
-            august:8, september:9, october:10, november:11, december:12,
-            januari:1, februari:2, maret:3, mei:5, juni:6, juli:7,
-            agustus:8, oktober:10, desember:12
-        };
-
-        function rakitIso(th, bl, hr) {
-            return th + '-' + String(bl).padStart(2, '0') + '-' + String(hr).padStart(2, '0');
-        }
-
-        function parseTanggalNotion(s) {
-            if (!s) return '';
-            s = String(s).trim();
-
-            let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-            if (m) return m[1] + '-' + m[2] + '-' + m[3];
-
-            m = s.match(/^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/);
-            if (m && BULAN_NAMA[m[1].toLowerCase()]) return rakitIso(m[3], BULAN_NAMA[m[1].toLowerCase()], m[2]);
-
-            m = s.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
-            if (m && BULAN_NAMA[m[2].toLowerCase()]) return rakitIso(m[3], BULAN_NAMA[m[2].toLowerCase()], m[1]);
-
-            // Bentuk angka: Notion mengekspor bulan/hari/tahun.
-            m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-            if (m) return rakitIso(m[3], m[1], m[2]);
-
-            return '';
-        }
-
-        // Pengurai CSV yang menghormati tanda kutip, karena judul konten bisa
-        // mengandung koma.
-        function parseCSV(teks) {
-            const hasil = [];
-            let kolom = '', baris = [], dalamKutip = false;
-            teks = String(teks).replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-            if (teks.charCodeAt(0) === 0xFEFF) teks = teks.slice(1);
-
-            for (let i = 0; i < teks.length; i++) {
-                const c = teks[i];
-                if (dalamKutip) {
-                    if (c === '"') {
-                        if (teks[i + 1] === '"') { kolom += '"'; i++; }
-                        else dalamKutip = false;
-                    } else kolom += c;
-                } else if (c === '"') {
-                    dalamKutip = true;
-                } else if (c === ',') {
-                    baris.push(kolom); kolom = '';
-                } else if (c === '\n') {
-                    baris.push(kolom); hasil.push(baris); baris = []; kolom = '';
-                } else kolom += c;
-            }
-            if (kolom.length || baris.length) { baris.push(kolom); hasil.push(baris); }
-            return hasil.filter(r => r.some(v => String(v).trim()));
-        }
+        const parseTanggalNotion = PantauCore.parseTanggalNotion;
+        const parseCSV = PantauCore.parseCSV;
 
         function importCsvNotion(teks) {
-            const baris = parseCSV(teks);
-            if (baris.length < 2) { alert('Berkas CSV kosong atau tidak terbaca.'); return; }
-
-            const kepala = baris[0].map(h => String(h).trim().toLowerCase());
-            const iNama = kepala.indexOf('content name');
-            const iTgl = kepala.indexOf('film date');
-
-            if (iNama === -1 || iTgl === -1) {
+            const hasil = PantauCore.rowsFromNotionCsv(teks);
+            if (hasil.error === 'kosong') { alert('Berkas CSV kosong atau tidak terbaca.'); return; }
+            if (hasil.error === 'kolom') {
                 alert('Kolom "Content name" atau "Film date" tidak ada di berkas ini.\n\nKolom yang terbaca:\n' +
-                      baris[0].join(', ') + '\n\nPastikan yang diekspor memang database Content Calendar.');
+                      hasil.header.join(', ') + '\n\nPastikan yang diekspor memang database Content Calendar.');
                 return;
             }
-
-            const data = [];
-            let tanggalGagal = 0;
-            for (let i = 1; i < baris.length; i++) {
-                const nama = String(baris[i][iNama] || '').trim();
-                const mentah = String(baris[i][iTgl] || '').trim();
-                const tgl = parseTanggalNotion(mentah);
-                if (nama && tgl) data.push({ nama: nama, tgl: tgl });
-                else if (nama && mentah) tanggalGagal++;
-            }
-
-            if (!data.length) {
-                alert('Tidak ada baris yang bisa dibaca dari ' + (baris.length - 1) + ' baris.\n\nKemungkinan format tanggalnya tidak dikenali.');
+            if (!hasil.rows.length) {
+                alert('Tidak ada baris yang bisa dibaca dari ' + hasil.totalBaris + ' baris.\n\nKemungkinan format tanggalnya tidak dikenali.');
                 return;
             }
-            if (tanggalGagal) {
-                alert(tanggalGagal + ' baris dilewati karena tanggalnya tidak terbaca. Sisanya tetap diproses.');
+            if (hasil.tanggalGagal) {
+                alert(hasil.tanggalGagal + ' baris dilewati karena tanggalnya tidak terbaca. Sisanya tetap diproses.');
             }
-            terapkanRiwayatNotion(data);
+            return terapkanRiwayatNotion(hasil.rows);
         }
 
         document.getElementById('csvNotionBtn').addEventListener('click', () => {
@@ -3581,6 +3815,12 @@
             if (btn) {
                 e.preventDefault();
                 generateContractPDF(btn.dataset.contractPdf);
+            }
+            const versi = e.target.closest('[data-letter-version]');
+            if (versi) {
+                e.preventDefault();
+                const [talentId, version] = versi.dataset.letterVersion.split('|');
+                unduhVersiSurat(talentId, version);
             }
         });
 

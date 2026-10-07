@@ -12,6 +12,9 @@ import { readFileSync } from "node:fs";
 import { JSDOM } from "jsdom";
 
 const html = readFileSync(new URL("../pantau-talent.html", import.meta.url), "utf8");
+// External scripts are not loaded in these tests, so the shared metrics
+// module is evaluated into the page by hand before the inline script runs.
+const coreSrc = readFileSync(new URL("../data/pantau-core.js", import.meta.url), "utf8");
 
 const TALENT = {
   id: "talent-1",
@@ -51,8 +54,12 @@ function bukaHalaman({ uploads = [] } = {}) {
         },
         configurable: true,
       });
+      // Pin "today" inside the contract month; otherwise these tests break as
+      // soon as the real clock leaves September 2026.
+      window.Date.now = () => Date.parse("2026-09-20T03:00:00Z");
       window.confirm = vi.fn(() => true);
       window.alert = vi.fn();
+      window.eval(coreSrc);
     },
   });
   return dom;
@@ -191,5 +198,34 @@ describe("chip kalender pada tanggal yang sudah ada catatannya", () => {
     doc.getElementById("calDetailUndoBtn").click();
 
     expect(simpanan(dom).uploads).toHaveLength(1);
+  });
+});
+
+describe("kalender bisa di-scroll ke bulan berikutnya", () => {
+  it("bulan berjalan dan bulan-bulan sesudahnya tergambar berderet", () => {
+    const dom = bukaHalaman();
+    const bulan = [...dom.window.document.querySelectorAll("[data-cal-month]")].map((el) => el.dataset.calMonth);
+    expect(bulan.slice(0, 3)).toEqual(["2026-09", "2026-10", "2026-11"]);
+  });
+
+  it("deretan diperpanjang sampai bulan kontrak terakhir berakhir", () => {
+    const dom = new JSDOM(html, {
+      runScripts: "dangerously",
+      url: "https://kol-panel-website.vercel.app/pantau-talent.html",
+      resources: undefined,
+      beforeParse(window) {
+        const panjang = { ...TALENT, endDate: "2027-02-15" };
+        const data = JSON.stringify({ talents: [panjang], uploads: [], setelan: {} });
+        Object.defineProperty(window, "localStorage", {
+          value: { getItem: () => data, setItem() {}, removeItem() {} },
+          configurable: true,
+        });
+        window.Date.now = () => Date.parse("2026-09-20T03:00:00Z");
+        window.eval(coreSrc);
+      },
+    });
+    const bulan = [...dom.window.document.querySelectorAll("[data-cal-month]")].map((el) => el.dataset.calMonth);
+    expect(bulan[bulan.length - 1]).toBe("2027-02");
+    expect(bulan).toHaveLength(6);
   });
 });

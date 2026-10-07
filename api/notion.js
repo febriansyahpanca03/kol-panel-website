@@ -61,7 +61,9 @@ module.exports = async function handler(req, res) {
                     ? judul.title.map(t => t.plain_text).join('').trim() : '';
                 const tgl = tanggal && tanggal.date && tanggal.date.start
                     ? String(tanggal.date.start).slice(0, 10) : '';
-                if (nama && tgl) baris.push({ nama: nama, tgl: tgl });
+                // ID halaman ikut dikirim: itu kunci dedupe di dashboard,
+                // sehingga menarik ulang tidak menggandakan riwayat.
+                if (nama && tgl) baris.push({ nama: nama, tgl: tgl, notionId: String(p.id || '').replace(/-/g, '').toLowerCase() });
             });
 
             cursor = data.has_more ? data.next_cursor : undefined;
