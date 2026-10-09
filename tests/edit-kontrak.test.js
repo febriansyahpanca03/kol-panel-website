@@ -94,7 +94,7 @@ describe("planContractEdit", () => {
     const pertama = C.planContractEdit(RINA, { quota: 12, value: 6000000 }, UPLOADS, TODAY, NOW).talent;
     const kedua = C.planContractEdit(pertama, { phone: "0813" }, UPLOADS, TODAY, "2026-09-27T01:00:00.000Z").talent;
     expect(kedua.changeLog).toEqual([
-      { at: NOW, field: "quota", label: "Kuota video", from: "10", to: "12" },
+      { at: NOW, field: "quota", label: "Kuota", from: "10", to: "12" },
       { at: NOW, field: "value", label: "Nilai kontrak", from: "5000000", to: "6000000" },
       { at: "2026-09-27T01:00:00.000Z", field: "phone", label: "No. kontak", from: "0812", to: "0813" },
     ]);

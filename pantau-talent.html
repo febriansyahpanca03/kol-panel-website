@@ -1480,6 +1480,42 @@
         .change-log td { text-align: left; vertical-align: top; }
         @media (max-width: 768px) { .impact-grid { grid-template-columns: 1fr; } }
 
+        /* ---------------- Pilihan di formulir kontrak ---------------- */
+        [hidden] { display: none !important; }
+        .choice-chips { display: flex; flex-wrap: wrap; gap: var(--spacing-sm); margin: var(--spacing-xs) 0; }
+        .choice-chip {
+            display: inline-flex; align-items: center; gap: 6px;
+            min-height: 36px; padding: 6px 12px;
+            border: 1px solid var(--line); border-radius: var(--radius-sm);
+            background-color: var(--surface-2); color: var(--txt);
+            font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+            transition: background-color var(--motion-fast), border-color var(--motion-fast);
+        }
+        .choice-chip input { accent-color: var(--accent); margin: 0; }
+        .choice-chip:has(input:checked),
+        .choice-chip.active { border-color: var(--accent); background-color: var(--accent-wash); color: var(--txt); }
+        .choice-chip:focus-visible, .choice-chip:has(input:focus-visible) { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+        .form-block { margin-bottom: var(--spacing-lg); }
+        .seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: var(--spacing-xs) 0 var(--spacing-sm); border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; background-color: var(--line); }
+        .seg-btn { font: inherit; font-size: 13px; line-height: 1.3; padding: 8px 10px; border: 0; background-color: var(--bg); color: var(--txt-muted); cursor: pointer; }
+        .seg-btn.active { background-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+
+        .sched-preview { margin-top: var(--spacing-sm); font-size: 13px; color: var(--txt-muted); }
+        .field-error { margin-top: var(--spacing-xs); color: var(--warn); font-size: 13px; font-weight: 600; }
+
+        .mini-cal { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: var(--spacing-lg); max-height: 360px; overflow-y: auto; padding: var(--spacing-xs) 2px; }
+        .mini-cal-title { font-size: 13px; font-weight: 700; margin-bottom: var(--spacing-xs); text-transform: capitalize; }
+        .mini-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .mini-cal-dayname { font: inherit; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--txt-muted); background: none; border: 0; padding: 4px 0; cursor: pointer; }
+        .mini-cal-dayname:hover { color: var(--accent); }
+        .mini-cal-day { font: inherit; font-size: 12px; height: 32px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); color: var(--txt); cursor: pointer; }
+        .mini-cal-day:disabled { opacity: .3; cursor: default; }
+        .mini-cal-day.active { background-color: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+
+        .talent-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+        .talent-card-platform.is-missing { color: var(--warn); background-color: var(--warn-bg); }
+
         /* ---------------- Empty state ---------------- */
         .empty-state { min-height: 240px; display: grid; place-content: center; }
         .empty-state-icon {
@@ -1653,7 +1689,10 @@
                     <option value="">Semua platform</option>
                     <option value="TikTok">TikTok</option>
                     <option value="Instagram">Instagram</option>
+                    <option value="YouTube">YouTube</option>
+                    <option value="Facebook">Facebook</option>
                     <option value="Threads">Threads</option>
+                    <option value="__kosong">Platform belum diisi</option>
                 </select>
                 <button class="button button-primary" id="addTalentBtn">+ Tambah Talent</button>
             </div>
@@ -1710,7 +1749,7 @@
                 <div class="card-row">
                     <div class="setting-item">
                         <div class="field">
-                            <div class="field-label">Kuota menipis (video minimum)</div>
+                            <div class="field-label">Kuota menipis (jumlah konten minimum)</div>
                             <input type="number" id="lowQuotaVideos" min="1" max="100" value="2">
                             <div class="setting-description">Peringatan jika sisa kuota mencapai angka ini atau lebih rendah</div>
                         </div>
@@ -1731,9 +1770,9 @@
                     </div>
                     <div class="setting-item">
                         <div class="field">
-                            <div class="field-label">Tertinggal dari target (video)</div>
+                            <div class="field-label">Tertinggal dari target (jumlah konten)</div>
                             <input type="number" id="behindThreshold" min="1" max="100" value="2">
-                            <div class="setting-description">Peringatan jika tertinggal N video atau lebih dari target</div>
+                            <div class="setting-description">Peringatan jika tertinggal N konten atau lebih dari target</div>
                         </div>
                     </div>
                 </div>
@@ -1817,19 +1856,20 @@
                     </div>
                 </div>
 
+                <div class="field form-block">
+                    <div class="field-label" id="talentPlatformsLabel">Platform (boleh lebih dari satu)</div>
+                    <div class="choice-chips" id="talentPlatforms" role="group" aria-labelledby="talentPlatformsLabel"></div>
+                    <div class="setting-description">Konten yang di-mirror ke beberapa platform tetap dihitung satu konten.</div>
+                    <div class="field-error" id="talentPlatformsError" hidden>Pilih minimal satu platform.</div>
+                </div>
+
                 <div class="card-row">
                     <div class="field">
-                        <div class="field-label">Platform</div>
-                        <select id="talentPlatform" required>
-                            <option value="">-- Pilih Platform --</option>
-                            <option value="TikTok">TikTok</option>
-                            <option value="Instagram">Instagram</option>
-                            <option value="YouTube">YouTube</option>
-                            <option value="Lainnya">Lainnya</option>
-                        </select>
+                        <div class="field-label">Jenis Konten</div>
+                        <select id="talentContentType"></select>
                     </div>
                     <div class="field">
-                        <div class="field-label">Kuota Video</div>
+                        <div class="field-label" id="talentQuotaLabel">Kuota Video</div>
                         <input type="number" id="talentQuota" required min="1">
                     </div>
                 </div>
@@ -1850,10 +1890,31 @@
                         <div class="field-label">Nilai Kontrak (IDR)</div>
                         <input type="number" id="talentValue" required min="0">
                     </div>
-                    <div class="field">
-                        <div class="field-label">Hari Upload (pisah koma: 0=Minggu, 1=Senin, dst)</div>
-                        <input type="text" id="talentUploadDays" placeholder="0,3,5" value="">
+                    <div class="field"></div>
+                </div>
+
+                <!-- Jadwal upload: dipilih, tidak diketik. Nilainya tetap disimpan
+                     di dua input tersembunyi agar bentuk datanya tidak berubah. -->
+                <div class="field form-block">
+                    <div class="field-label">Jadwal Upload</div>
+                    <div class="seg" role="tablist" aria-label="Cara menentukan jadwal">
+                        <button type="button" class="seg-btn" data-sched-mode="hari" role="tab">Hari tetap tiap minggu</button>
+                        <button type="button" class="seg-btn" data-sched-mode="tanggal" role="tab">Pilih tanggal di kalender</button>
+                        <button type="button" class="seg-btn" data-sched-mode="rata" role="tab">Sebar rata otomatis</button>
                     </div>
+                    <div class="sched-panel" data-sched-panel="hari">
+                        <div class="choice-chips" id="talentDayChips" role="group" aria-label="Hari upload"></div>
+                    </div>
+                    <div class="sched-panel" data-sched-panel="tanggal">
+                        <div class="setting-description">Klik tanggal untuk memilih atau membatalkan. Klik nama hari untuk memilih semua hari itu dalam periode.</div>
+                        <div class="mini-cal" id="talentDatePicker"></div>
+                    </div>
+                    <div class="sched-panel" data-sched-panel="rata">
+                        <div class="setting-description">Kuota disebar rata sepanjang periode kontrak. Cocok bila hari upload bebas.</div>
+                    </div>
+                    <div class="sched-preview" id="talentSchedPreview" aria-live="polite"></div>
+                    <input type="hidden" id="talentUploadDays" value="">
+                    <input type="hidden" id="talentUploadDates" value="">
                 </div>
 
                 <div class="form-section-title">Data untuk Surat Kontrak</div>
@@ -2241,7 +2302,7 @@
                         talentId: talent.id,
                         name: talent.name,
                         account: talent.account,
-                        detail: `Kontrak berakhir ${Math.abs(daysLeft)} hari lalu, sisa ${m.remaining} video`
+                        detail: `Kontrak berakhir ${Math.abs(daysLeft)} hari lalu, sisa ${m.remaining} ${PantauCore.contentTypeOf(talent).unit}`
                     });
                 }
 
@@ -2263,7 +2324,7 @@
                         account: talent.account,
                         detail: m.over
                             ? `Kuota ${m.quota} terpenuhi, +${m.over} melebihi kuota`
-                            : `Sisa ${m.remaining} dari ${m.quota} video`
+                            : `Sisa ${m.remaining} dari ${m.quota} ${PantauCore.contentTypeOf(talent).unit}`
                     });
                 }
 
@@ -2439,7 +2500,8 @@
             const filteredTalents = state.talents.filter(talent => {
                 const matchesText = !search || [talent.name, talent.account]
                     .some(value => String(value || '').toLocaleLowerCase('id-ID').includes(search));
-                const matchesPlatform = !platform || talent.platform === platform;
+                const matchesPlatform = !platform
+                    || (platform === '__kosong' ? PantauCore.platformMissing(talent) : PantauCore.platformsOf(talent).indexOf(platform) !== -1);
                 return matchesText && matchesPlatform;
             });
 
@@ -2484,7 +2546,7 @@
                 const quotaBoxes = (m.quota <= 24
                     ? renderQuotaBoxes(m.quota, m.uploaded)
                     : renderProgressBar(m.quota, m.uploaded)) +
-                    `<div class="quota-caption">${m.uploaded} dari ${m.quota} video &middot; ${m.percent}%` +
+                    `<div class="quota-caption">${m.uploaded} dari ${m.quota} ${PantauCore.contentTypeOf(talent).unit} &middot; ${m.percent}%` +
                     (m.over ? ` &middot; <strong class="quota-over">+${m.over} melebihi kuota</strong>` : '') +
                     (m.unscheduled ? ` &middot; <span class="quota-over">${m.unscheduled} kuota tidak muat di jadwal</span>` : '') +
                     `</div>`;
@@ -2514,7 +2576,12 @@
                             <div class="talent-card-info">
                                 <div class="talent-card-name">${talent.name}</div>
                                 <div class="talent-card-account">@${talent.account}</div>
-                                <div class="talent-card-platform">${talent.platform}</div>
+                                <div class="talent-card-tags">
+                                    ${PantauCore.platformMissing(talent)
+                                        ? '<span class="talent-card-platform is-missing" data-platform-missing>platform belum diisi</span>'
+                                        : PantauCore.platformsOf(talent).map(p => `<span class="talent-card-platform">${escapeHtml(p)}</span>`).join('')}
+                                    <span class="talent-card-platform">${PantauCore.contentTypeOf(talent).label}</span>
+                                </div>
                             </div>
                             <div class="talent-card-quota${m.over ? ' is-over' : ''}">
                                 <div class="talent-card-quota-number">${m.over ? '+' + m.over : m.remaining}</div>
@@ -2538,8 +2605,8 @@
                                     <div class="field-value">${formatCurrency(talent.value)}</div>
                                 </div>
                                 <div class="field">
-                                    <div class="field-label">Hari Upload</div>
-                                    <div class="field-value">${getUploadDaysArray(talent).map(d => getDayName(d)).join(', ') || '<span class="text-muted">belum diisi &middot; jadwal disebar rata</span>'}</div>
+                                    <div class="field-label">Jadwal Upload</div>
+                                    <div class="field-value">${teksJadwal(talent)}</div>
                                 </div>
                                 <div class="field">
                                     <div class="field-label">Jadwal sampai hari ini</div>
@@ -2621,6 +2688,14 @@
             const d = new Date(isoStr);
             if (isNaN(d.getTime())) return isoStr || '';
             return d.toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+        }
+
+        function teksJadwal(talent) {
+            const tanggal = PantauCore.uploadDatesOf(talent);
+            if (tanggal.length) return `${tanggal.length} tanggal dipilih &middot; ${formatDate(tanggal[0])} &ndash; ${formatDate(tanggal[tanggal.length - 1])}`;
+            const hari = getUploadDaysArray(talent);
+            if (hari.length) return hari.map(d => getDayName(d)).join(', ');
+            return '<span class="text-muted">belum diisi &middot; jadwal disebar rata</span>';
         }
 
         function letterButtonLabel(talent) {
@@ -2711,7 +2786,7 @@
                     <td style="text-align: left;">@${talent.account}</td>
                     <td>${talent.startDate}</td>
                     <td>${talent.endDate}</td>
-                    <td>${talent.quota}</td>
+                    <td>${talent.quota} ${PantauCore.contentTypeOf(talent).unit}</td>
                     <td>${formatCurrency(talent.value)}</td>
                     <td>
                         <button type="button" class="button button-small button-primary" data-contract-pdf="${talent.id}">📄 ${letterButtonLabel(talent)}</button>
@@ -2806,7 +2881,6 @@
                     title.textContent = 'Ubah Talent';
                     document.getElementById('talentName').value = talent.name;
                     document.getElementById('talentAccount').value = talent.account;
-                    document.getElementById('talentPlatform').value = talent.platform;
                     document.getElementById('talentQuota').value = talent.quota;
                     document.getElementById('talentStartDate').value = talent.startDate;
                     document.getElementById('talentEndDate').value = talent.endDate;
@@ -2821,6 +2895,7 @@
                     document.getElementById('talentDpPercent').value = talent.dpPercent === undefined || talent.dpPercent === null ? '' : talent.dpPercent;
                     document.getElementById('talentNotionName').value = talent.notionName || '';
                     form.dataset.talentId = talentId;
+                    isiPilihanKontrak(talent);
                 }
             } else {
                 title.textContent = 'Tambah Talent';
@@ -2828,6 +2903,8 @@
                 // Set today's date as default start date
                 const today = todayIso();
                 document.getElementById('talentStartDate').value = today;
+                // Semua KOL saat ini me-mirror kontennya ke TikTok dan Reels.
+                isiPilihanKontrak({ platforms: ['TikTok', 'Instagram'], contentType: 'video', uploadDays: '' }, 'hari');
             }
 
             modal.classList.add('active');
@@ -2844,15 +2921,21 @@
             const dpNum = parseInt(dpRaw, 10);
             const dpValue = dpRaw === '' || isNaN(dpNum) ? '' : Math.max(0, Math.min(100, dpNum));
 
+            const pilihan = bacaPilihanKontrak();
+            if (pilihan.error) return;
+
             const talentData = {
                 name: document.getElementById('talentName').value,
                 account: document.getElementById('talentAccount').value,
-                platform: document.getElementById('talentPlatform').value,
+                platforms: pilihan.platforms,
+                platform: pilihan.platforms.join(', '),
+                contentType: pilihan.contentType,
+                uploadDates: pilihan.uploadDates,
                 quota: parseInt(document.getElementById('talentQuota').value),
                 startDate: document.getElementById('talentStartDate').value,
                 endDate: document.getElementById('talentEndDate').value,
                 value: parseInt(document.getElementById('talentValue').value),
-                uploadDays: document.getElementById('talentUploadDays').value,
+                uploadDays: pilihan.uploadDays,
                 fullName: document.getElementById('talentFullName').value.trim(),
                 phone: document.getElementById('talentPhone').value.trim(),
                 address: document.getElementById('talentAddress').value.trim(),
@@ -2941,6 +3024,221 @@
         function closeTalentModal() {
             document.getElementById('talentModal').classList.remove('active');
         }
+
+        // ---- Pilihan kontrak: platform, jenis konten, jadwal upload --------
+        // Semua dipilih lewat tombol, tidak diketik. Nilai jadwal disimpan di
+        // input tersembunyi #talentUploadDays dan #talentUploadDates.
+        const NAMA_HARI_PENDEK = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+        function siapkanPilihanKontrak() {
+            document.getElementById('talentPlatforms').innerHTML = PantauCore.PLATFORMS.map(p => `
+                <label class="choice-chip"><input type="checkbox" name="talentPlatform" value="${p}"><span>${p === 'Instagram' ? 'Instagram (Reels)' : p}</span></label>
+            `).join('');
+            document.getElementById('talentContentType').innerHTML = PantauCore.CONTENT_TYPES
+                .map(c => `<option value="${c.id}">${c.label}</option>`).join('');
+            // Senin dulu, Minggu terakhir — urutan yang biasa dipakai di sini.
+            document.getElementById('talentDayChips').innerHTML = [1, 2, 3, 4, 5, 6, 0].map(d => `
+                <button type="button" class="choice-chip" data-day-chip="${d}" aria-pressed="false">${getDayName(d)}</button>
+            `).join('');
+        }
+
+        function isiPilihanKontrak(talent, modeAwal) {
+            const platforms = PantauCore.platformsOf(talent);
+            document.querySelectorAll('[name="talentPlatform"]').forEach(cb => { cb.checked = platforms.indexOf(cb.value) !== -1; });
+            document.getElementById('talentPlatformsError').hidden = true;
+            document.getElementById('talentContentType').value = PantauCore.contentTypeOf(talent).id;
+            document.getElementById('talentUploadDays').value = talent.uploadDays || '';
+            document.getElementById('talentUploadDates').value = PantauCore.uploadDatesOf(talent).join(',');
+            const mode = modeAwal || (PantauCore.uploadDatesOf(talent).length ? 'tanggal'
+                : PantauCore.uploadDaysOf(talent).length ? 'hari' : 'rata');
+            aturModeJadwal(mode);
+        }
+
+        function aturModeJadwal(mode) {
+            document.getElementById('talentForm').dataset.schedMode = mode;
+            document.querySelectorAll('[data-sched-mode]').forEach(b => {
+                const aktif = b.dataset.schedMode === mode;
+                b.classList.toggle('active', aktif);
+                b.setAttribute('aria-selected', aktif ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-sched-panel]').forEach(p => { p.hidden = p.dataset.schedPanel !== mode; });
+            segarkanPilihanJadwal();
+        }
+
+        function tanggalTerpilih() {
+            return document.getElementById('talentUploadDates').value.split(',').filter(Boolean);
+        }
+
+        function jenisTerpilih() {
+            return PantauCore.contentTypeOf({ contentType: document.getElementById('talentContentType').value });
+        }
+
+        // Menggambar ulang tombol hari, kalender mini, label kuota, dan pratinjau.
+        function segarkanPilihanJadwal() {
+            const mode = document.getElementById('talentForm').dataset.schedMode || 'rata';
+            const hari = PantauCore.uploadDaysOf({ uploadDays: document.getElementById('talentUploadDays').value });
+            document.querySelectorAll('[data-day-chip]').forEach(b => {
+                const on = hari.indexOf(Number(b.dataset.dayChip)) !== -1;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+
+            const jenis = jenisTerpilih();
+            document.getElementById('talentQuotaLabel').textContent = 'Kuota ' + jenis.label;
+
+            if (mode === 'tanggal') gambarKalenderMini();
+
+            const sementara = {
+                quota: document.getElementById('talentQuota').value,
+                startDate: document.getElementById('talentStartDate').value,
+                endDate: document.getElementById('talentEndDate').value,
+                uploadDays: mode === 'hari' ? document.getElementById('talentUploadDays').value : '',
+                uploadDates: mode === 'tanggal' ? tanggalTerpilih() : []
+            };
+            const slot = PantauCore.buildSchedule(sementara);
+            const kuota = parseInt(sementara.quota, 10) || 0;
+            const el = document.getElementById('talentSchedPreview');
+
+            if (mode === 'hari' && !sementara.uploadDays) {
+                el.innerHTML = '<div class="field-error">Pilih minimal satu hari upload.</div>';
+                return;
+            }
+            if (mode === 'tanggal' && !sementara.uploadDates.length) {
+                el.innerHTML = '<div class="field-error">Belum ada tanggal yang dipilih.</div>';
+                return;
+            }
+            if (!sementara.startDate || !sementara.endDate || !kuota) {
+                el.innerHTML = '<span class="text-muted">Isi kuota dan periode kontrak untuk melihat jadwalnya.</span>';
+                return;
+            }
+            let teks = `${slot.length} jadwal ${jenis.unit}` +
+                (slot.length ? ` &middot; pertama ${formatDate(slot[0])}, terakhir ${formatDate(slot[slot.length - 1])}` : '');
+            if (mode === 'tanggal') teks = `${tanggalTerpilih().length} tanggal dipilih untuk kuota ${kuota} &middot; ` + teks;
+            if (slot.length < kuota) {
+                teks += `<div class="field-error">${kuota - slot.length} ${jenis.unit} belum punya jadwal. ` +
+                    (mode === 'tanggal' ? 'Pilih tanggal lagi.' : mode === 'hari' ? 'Tambah hari upload atau perpanjang periode.' : '') + '</div>';
+            }
+            el.innerHTML = teks;
+        }
+
+        // Kalender mini selama periode kontrak; klik tanggal untuk memilih.
+        function gambarKalenderMini() {
+            const wadah = document.getElementById('talentDatePicker');
+            const mulai = document.getElementById('talentStartDate').value;
+            const akhir = document.getElementById('talentEndDate').value;
+            if (!mulai || !akhir || akhir < mulai) {
+                wadah.innerHTML = '<div class="text-muted">Isi tanggal mulai dan berakhir dulu.</div>';
+                return;
+            }
+            const terpilih = new Set(tanggalTerpilih());
+            const [y0, m0] = mulai.split('-').map(Number);
+            const [y1, m1] = akhir.split('-').map(Number);
+            const jumlahBulan = Math.min(24, (y1 - y0) * 12 + (m1 - m0) + 1);
+
+            let html = '';
+            for (let i = 0; i < jumlahBulan; i++) {
+                const awal = new Date(y0, m0 - 1 + i, 1);
+                const y = awal.getFullYear(), m = awal.getMonth();
+                html += '<div class="mini-cal-month"><div class="mini-cal-title">' +
+                    awal.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' }) + '</div><div class="mini-cal-grid">';
+                NAMA_HARI_PENDEK.forEach((n, d) => {
+                    html += `<button type="button" class="mini-cal-dayname" data-pick-weekday="${d}" title="Pilih/batalkan semua ${getDayName(d)} dalam periode">${n}</button>`;
+                });
+                const pad = awal.getDay();
+                const jumlahHari = new Date(y, m + 1, 0).getDate();
+                for (let k = 0; k < pad; k++) html += '<span></span>';
+                for (let tgl = 1; tgl <= jumlahHari; tgl++) {
+                    const iso = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(tgl).padStart(2, '0');
+                    const diLuar = iso < mulai || iso > akhir;
+                    html += `<button type="button" class="mini-cal-day${terpilih.has(iso) ? ' active' : ''}" data-pick-date="${iso}"` +
+                        (diLuar ? ' disabled' : '') + ` aria-pressed="${terpilih.has(iso)}">${tgl}</button>`;
+                }
+                html += '</div></div>';
+            }
+            wadah.innerHTML = html;
+        }
+
+        function simpanTanggal(set) {
+            document.getElementById('talentUploadDates').value = [...set].sort().join(',');
+            segarkanPilihanJadwal();
+        }
+
+        function bacaPilihanKontrak() {
+            const platforms = [...document.querySelectorAll('[name="talentPlatform"]:checked')].map(cb => cb.value);
+            const err = document.getElementById('talentPlatformsError');
+            err.hidden = platforms.length > 0;
+            if (!platforms.length) {
+                err.scrollIntoView && err.scrollIntoView({ block: 'center' });
+                return { error: 'platform' };
+            }
+            const mode = document.getElementById('talentForm').dataset.schedMode || 'rata';
+            const kosong = (mode === 'hari' && !PantauCore.uploadDaysOf({ uploadDays: document.getElementById('talentUploadDays').value }).length)
+                || (mode === 'tanggal' && !tanggalTerpilih().length);
+            if (kosong) {
+                segarkanPilihanJadwal();
+                const pv = document.getElementById('talentSchedPreview');
+                pv.scrollIntoView && pv.scrollIntoView({ block: 'center' });
+                return { error: 'jadwal' };
+            }
+            return {
+                platforms,
+                contentType: document.getElementById('talentContentType').value || 'video',
+                uploadDays: mode === 'hari' ? PantauCore.uploadDaysOf({ uploadDays: document.getElementById('talentUploadDays').value }).join(',') : '',
+                uploadDates: mode === 'tanggal' ? tanggalTerpilih() : []
+            };
+        }
+
+        siapkanPilihanKontrak();
+
+        document.querySelectorAll('[data-sched-mode]').forEach(b => {
+            b.addEventListener('click', () => aturModeJadwal(b.dataset.schedMode));
+        });
+
+        document.getElementById('talentDayChips').addEventListener('click', e => {
+            const b = e.target.closest('[data-day-chip]');
+            if (!b) return;
+            const hari = new Set(PantauCore.uploadDaysOf({ uploadDays: document.getElementById('talentUploadDays').value }));
+            const d = Number(b.dataset.dayChip);
+            if (hari.has(d)) hari.delete(d); else hari.add(d);
+            document.getElementById('talentUploadDays').value = [...hari].sort((a, c) => a - c).join(',');
+            segarkanPilihanJadwal();
+        });
+
+        document.getElementById('talentDatePicker').addEventListener('click', e => {
+            const set = new Set(tanggalTerpilih());
+            const tgl = e.target.closest('[data-pick-date]');
+            if (tgl && !tgl.disabled) {
+                const iso = tgl.dataset.pickDate;
+                if (set.has(iso)) set.delete(iso); else set.add(iso);
+                simpanTanggal(set);
+                return;
+            }
+            const kolom = e.target.closest('[data-pick-weekday]');
+            if (!kolom) return;
+            // Semua hari itu dalam periode sudah terpilih → batalkan; selain itu pilih semua.
+            const d = Number(kolom.dataset.pickWeekday);
+            const mulai = document.getElementById('talentStartDate').value;
+            const akhir = document.getElementById('talentEndDate').value;
+            const semua = [];
+            for (let iso = mulai; iso && iso <= akhir; iso = PantauCore.addDays(iso, 1)) {
+                if (new Date(iso + 'T00:00:00Z').getUTCDay() === d) semua.push(iso);
+            }
+            const sudahSemua = semua.length && semua.every(x => set.has(x));
+            semua.forEach(x => { if (sudahSemua) set.delete(x); else set.add(x); });
+            simpanTanggal(set);
+        });
+
+        ['talentQuota', 'talentStartDate', 'talentEndDate', 'talentContentType'].forEach(id => {
+            document.getElementById(id).addEventListener('input', segarkanPilihanJadwal);
+            document.getElementById(id).addEventListener('change', segarkanPilihanJadwal);
+        });
+
+        document.getElementById('talentPlatforms').addEventListener('change', () => {
+            if (document.querySelector('[name="talentPlatform"]:checked')) {
+                document.getElementById('talentPlatformsError').hidden = true;
+            }
+        });
+
 
         document.getElementById('cancelTalentBtn').addEventListener('click', closeTalentModal);
         document.querySelector('#talentModal .modal-close').addEventListener('click', closeTalentModal);
@@ -3352,13 +3650,18 @@
         function autoScheduleText(talent) {
             if (talent.scheduleText) return talent.scheduleText;
 
+            const unit = PantauCore.contentTypeOf(talent).unit;
+            const tanggal = PantauCore.uploadDatesOf(talent);
+            if (tanggal.length) {
+                return `${tanggal.length} ${unit} pada tanggal yang disepakati (${tanggal.map(d => longDate(d)).join(', ')})`;
+            }
             const days = getUploadDaysArray(talent);
             const spanDays = totalDaysInContract(talent.startDate, talent.endDate);
             const weeks = Math.max(1, Math.round(spanDays / 7));
             const perWeek = talent.quota / weeks;
             const shown = Number.isInteger(perWeek) ? perWeek : perWeek.toFixed(1).replace('.', ',');
 
-            return `${shown} video per minggu` + (days.length
+            return `${shown} ${unit} per minggu` + (days.length
                 ? ` (${days.map(getDayName).join(', ')})`
                 : ' (hari fleksibel, disesuaikan bersama tim)');
         }
@@ -3600,16 +3903,22 @@
             // --- Pasal 1 -------------------------------------------------------
             para('Pasal 1: Ruang Lingkup Pekerjaan', { style: 'bold', size: 11, gap: 3 });
             para(`1. Pembuatan Konten Promosi untuk Akun ${s.publishAccount || s.companyName || ''}`, { style: 'bold', gap: 2.5 });
-            bullet(`Jumlah: ${quota} video`);
-            bullet(`Harga per video: ${rupiah(perVideo)}`);
+            const jenis = PantauCore.contentTypeOf(talent);
+            const platformSurat = PantauCore.platformsOf(talent);
+            bullet(`Jenis konten: ${jenis.label}`);
+            bullet(`Jumlah: ${quota} ${jenis.unit}`);
+            bullet(`Harga per ${jenis.unit}: ${rupiah(perVideo)}`);
             bullet(`Total nilai: ${rupiah(total)}`);
             y += 3;
 
             para('2. Rincian Penawaran', { style: 'bold', gap: 2.5 });
-            bullet(`Jumlah Video: ${quota} video`);
+            bullet(`Jumlah ${jenis.label}: ${quota} ${jenis.unit}`);
             bullet(`Periode: ${longDate(talent.startDate)} s/d ${longDate(talent.endDate)}`);
             bullet(`Jadwal: ${autoScheduleText(talent)}`);
-            bullet(`Platform: ${talent.platform}`);
+            bullet(`Platform: ${platformSurat.join(', ') || PLACEHOLDER}`);
+            if (platformSurat.length > 1) {
+                bullet(`Konten yang sama diunggah ke semua platform di atas (mirroring) dan dihitung sebagai satu ${jenis.unit}.`);
+            }
             y += 3;
 
             labelValue('Media Publikasi:', 'Akun ' + (s.publishAccount || PLACEHOLDER));

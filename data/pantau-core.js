@@ -49,10 +49,22 @@
      * slot jatuh di hari itu. Kosong → kuota disebar rata sepanjang periode.
      * Algoritmanya sama persis dengan versi sebelumnya; hanya dipindah.
      */
-    function generateSlots(days, start, end, count, skip) {
+    // Tanggal upload yang dipilih satu per satu di kalender (bukan hari tetap
+    // tiap minggu). Disimpan sebagai daftar YYYY-MM-DD, urut dan unik.
+    function uploadDatesOf(talent) {
+        if (!talent || !Array.isArray(talent.uploadDates)) return [];
+        return [...new Set(talent.uploadDates.filter(d => parseIso(d) !== null))].sort();
+    }
+
+    function generateSlots(days, start, end, count, skip, dates) {
         const slots = [];
         if (count <= 0 || start === null || end === null || end < start) return slots;
-        if (days.length) {
+        if (dates && dates.length) {
+            dates.forEach(iso => {
+                const t = parseIso(iso);
+                if (slots.length < count && t >= start && t <= end && !skip.has(iso)) slots.push(iso);
+            });
+        } else if (days.length) {
             for (let t = start; t <= end && slots.length < count; t += DAY_MS) {
                 const iso = isoFromMs(t);
                 if (days.indexOf(new Date(t).getUTCDay()) !== -1 && !skip.has(iso)) slots.push(iso);
@@ -77,17 +89,18 @@
         const start = parseIso(talent && talent.startDate);
         const end = parseIso(talent && talent.endDate);
         const days = uploadDaysOf(talent);
+        const dates = uploadDatesOf(talent);
 
         const pinned = Array.isArray(talent && talent.pinnedSlots) ? talent.pinnedSlots.slice().sort() : null;
         if (pinned && pinned.length && talent.pinnedFrom) {
             const from = parseIso(talent.pinnedFrom);
             const mulai = start === null ? from : Math.max(start, from);
-            const fresh = generateSlots(days, mulai, end, quota - pinned.length, new Set(pinned));
+            const fresh = generateSlots(days, mulai, end, quota - pinned.length, new Set(pinned), dates);
             return pinned.concat(fresh).sort();
         }
 
         if (!quota) return [];
-        return generateSlots(days, start, end, quota, new Set());
+        return generateSlots(days, start, end, quota, new Set(), dates);
     }
 
     function byDateThenId(a, b) {
@@ -158,7 +171,7 @@
             // Kuota lebih besar dari slot yang muat di periode (mis. hari
             // upload terlalu jarang). Ditampilkan, bukan disembunyikan.
             unscheduled: Math.max(0, quota - slots.length),
-            scheduleMode: uploadDaysOf(talent).length ? 'hari' : 'rata',
+            scheduleMode: uploadDatesOf(talent).length ? 'tanggal' : uploadDaysOf(talent).length ? 'hari' : 'rata',
             daysLeft
         };
     }
@@ -355,15 +368,57 @@
     // Edit kontrak
     // ------------------------------------------------------------------------
 
+    // ------------------------------------------------------------------------
+    // Jenis konten dan platform
+    // ------------------------------------------------------------------------
+
+    // Satu kontrak = satu jenis konten. Kontrak lama tanpa jenis = video.
+    const CONTENT_TYPES = [
+        { id: 'video', label: 'Video', unit: 'video' },
+        { id: 'poster', label: 'Poster / foto feed', unit: 'poster' },
+        { id: 'carousel', label: 'Carousel', unit: 'carousel' },
+        { id: 'story', label: 'Story', unit: 'story' },
+        { id: 'live', label: 'Live', unit: 'sesi live' },
+        { id: 'lainnya', label: 'Konten lain', unit: 'konten' }
+    ];
+
+    function contentTypeOf(talent) {
+        const id = talent && talent.contentType;
+        return CONTENT_TYPES.find(c => c.id === id) || CONTENT_TYPES[0];
+    }
+
+    const PLATFORMS = ['TikTok', 'Instagram', 'YouTube', 'Facebook', 'Threads', 'Lainnya'];
+
+    // Kontrak lama menyimpan satu string `platform`; yang baru `platforms`
+    // (bisa lebih dari satu karena konten di-mirror ke beberapa platform).
+    function platformsOf(talent) {
+        if (!talent) return [];
+        const raw = Array.isArray(talent.platforms) && talent.platforms.length
+            ? talent.platforms
+            : String(talent.platform || '').split(/[,+/]/);
+        const out = [];
+        raw.map(p => String(p).trim()).filter(Boolean).forEach(p => {
+            const baku = PLATFORMS.find(x => x.toLowerCase() === p.toLowerCase()) || p;
+            if (out.indexOf(baku) === -1) out.push(baku);
+        });
+        return out;
+    }
+
+    // "Lainnya" saja dianggap belum diisi: tidak ada platform nyata yang tercatat.
+    function platformMissing(talent) {
+        const p = platformsOf(talent);
+        return !p.length || (p.length === 1 && p[0] === 'Lainnya');
+    }
+
     const FIELD_LABELS = {
-        name: 'Nama', account: 'Nama akun', platform: 'Platform', quota: 'Kuota video',
+        name: 'Nama', account: 'Nama akun', platforms: 'Platform', contentType: 'Jenis konten', quota: 'Kuota',
         startDate: 'Tanggal mulai', endDate: 'Tanggal berakhir', value: 'Nilai kontrak',
-        uploadDays: 'Hari upload', fullName: 'Nama lengkap', phone: 'No. kontak',
+        uploadDays: 'Hari upload', uploadDates: 'Tanggal upload', fullName: 'Nama lengkap', phone: 'No. kontak',
         address: 'Alamat', bank: 'Rekening pembayaran', scheduleText: 'Keterangan jadwal di surat',
         contractDate: 'Tanggal surat', dpPercent: 'Persentase DP', notionName: 'Nama di Notion'
     };
     const CONTRACT_FIELDS = Object.keys(FIELD_LABELS);
-    const SCHEDULE_FIELDS = ['quota', 'startDate', 'endDate', 'uploadDays'];
+    const SCHEDULE_FIELDS = ['quota', 'startDate', 'endDate', 'uploadDays', 'uploadDates'];
     // Nama di Notion hanya dipakai untuk impor, tidak tercetak di surat.
     const LETTER_FIELDS = CONTRACT_FIELDS.filter(f => f !== 'notionName');
 
@@ -375,15 +430,19 @@
         return uploadDaysOf({ uploadDays: v }).slice().sort((a, b) => a - b).join(',');
     }
 
-    function sameValue(field, a, b) {
-        if (field === 'uploadDays') return normalizeUploadDays(a) === normalizeUploadDays(b);
-        return asText(a) === asText(b);
+    // Nilai satu kolom dalam bentuk baku, untuk dibandingkan dan dicatat.
+    function fieldText(field, t) {
+        if (field === 'uploadDays') return normalizeUploadDays(t.uploadDays);
+        if (field === 'uploadDates') return uploadDatesOf(t).join(', ');
+        if (field === 'platforms') return platformsOf(t).join(', ');
+        if (field === 'contentType') return contentTypeOf(t).label;
+        return asText(t[field]);
     }
 
     function diffFields(before, after) {
         return CONTRACT_FIELDS
-            .filter(f => !sameValue(f, before[f], after[f]))
-            .map(f => ({ field: f, label: FIELD_LABELS[f], from: asText(before[f]), to: asText(after[f]) }));
+            .filter(f => fieldText(f, before) !== fieldText(f, after))
+            .map(f => ({ field: f, label: FIELD_LABELS[f], from: fieldText(f, before), to: fieldText(f, after) }));
     }
 
     // Selisih dua daftar tanggal sebagai multiset (dua slot bisa jatuh di
@@ -473,7 +532,8 @@
     root.PantauCore = {
         parseIso, addDays, daysBetween, uploadDaysOf, buildSchedule, talentMetrics,
         parseTanggalNotion, parseCSV, normalizeNotionId, rowsFromNotionCsv,
-        planNotionImport, findDuplicateUploads,
+        planNotionImport, findDuplicateUploads, uploadDatesOf,
+        CONTENT_TYPES, contentTypeOf, PLATFORMS, platformsOf, platformMissing,
         FIELD_LABELS, SCHEDULE_FIELDS, diffFields, diffSchedules, planContractEdit, createLetterVersion
     };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
