@@ -529,7 +529,245 @@
         return { talent: Object.assign({}, talent, { letters, letterStale: false }), letter };
     }
 
+    // ------------------------------------------------------------------------
+    // Biaya & performa
+    // ------------------------------------------------------------------------
+
+    // Kosong berarti "tidak ada data", bukan nol — nol palsu menyeret rata-rata.
+    // Angka dari sheet berlokal Indonesia memakai titik sebagai pemisah ribuan
+    // ("1.200" = seribu dua ratus) dan koma sebagai desimal.
+    function numOrNull(v) {
+        if (v === null || v === undefined) return null;
+        if (typeof v === 'number') return isFinite(v) ? v : null;
+        let s = String(v).trim().replace(/^rp\s*/i, '').replace(/\s/g, '');
+        if (!s) return null;
+        if (/^-?\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) s = s.replace(/\./g, '').replace(',', '.');
+        else if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, '');
+        else s = s.replace(',', '.');
+        const n = Number(s);
+        return isFinite(n) ? n : null;
+    }
+
+    function median(list) {
+        const xs = list.filter(x => x !== null && isFinite(x)).slice().sort((a, b) => a - b);
+        if (!xs.length) return null;
+        const mid = Math.floor(xs.length / 2);
+        return xs.length % 2 ? xs[mid] : (xs[mid - 1] + xs[mid]) / 2;
+    }
+
+    function monthOf(iso) {
+        return String(iso || '').slice(0, 7);
+    }
+
+    function pricePerContent(talent) {
+        const q = parseInt(talent && talent.quota, 10) || 0;
+        const v = Number(talent && talent.value) || 0;
+        return q ? v / q : null;
+    }
+
+    /**
+     * Buku biaya per talent per bulan. Biaya dicatat saat konten tayang:
+     * harga per konten (nilai kontrak ÷ kuota) × konten tayang bulan itu.
+     * Upload di atas kuota adalah bonus — tidak menambah biaya.
+     */
+    function monthlyLedger(talents, uploads) {
+        const out = {};
+        talents.forEach(t => {
+            const harga = pricePerContent(t) || 0;
+            const q = parseInt(t.quota, 10) || 0;
+            const own = uploads.filter(u => u.talentId === t.id && u.date).slice().sort(byDateThenId);
+            out[t.id] = {};
+            own.forEach((u, i) => {
+                const m = monthOf(u.date);
+                const a = out[t.id][m] || (out[t.id][m] = {
+                    konten: 0, bonus: 0, biaya: 0, views: 0, interaksi: 0, klik: 0,
+                    denganViews: 0, denganInteraksi: 0, denganKlik: 0
+                });
+                if (i < q) { a.konten++; a.biaya += harga; } else a.bonus++;
+                const v = numOrNull(u.views), it = numOrNull(u.interaksi), k = numOrNull(u.klik);
+                if (v !== null) { a.views += v; a.denganViews++; }
+                if (it !== null) { a.interaksi += it; a.denganInteraksi++; }
+                if (k !== null) { a.klik += k; a.denganKlik++; }
+            });
+        });
+        return out;
+    }
+
+    /** Jadwal kas keluar sesuai surat: DP di awal kontrak, pelunasan di akhir. */
+    function paymentSchedule(talent, dpPercent) {
+        const total = Number(talent.value) || 0;
+        const dp = Math.round(total * (Number(dpPercent) || 0) / 100);
+        const out = [];
+        if (dp > 0 && talent.startDate) out.push({ month: monthOf(talent.startDate), date: talent.startDate, jenis: 'DP', jumlah: dp });
+        if (total - dp > 0 && talent.endDate) out.push({ month: monthOf(talent.endDate), date: talent.endDate, jenis: 'Pelunasan', jumlah: total - dp });
+        return out;
+    }
+
+    /**
+     * CPM = biaya ÷ views × 1.000, CPV = biaya ÷ views, CPC = biaya ÷ klik,
+     * CPE = biaya ÷ interaksi, ER = interaksi ÷ views. Tanpa data → null,
+     * supaya layar menulis "belum ada data", bukan Rp0 yang terbaca gratis.
+     */
+    function costMetrics(input) {
+        const biaya = numOrNull(input.biaya);
+        const views = numOrNull(input.views);
+        const klik = numOrNull(input.klik);
+        const interaksi = numOrNull(input.interaksi);
+        const bagi = (a, b) => (a !== null && b !== null && b > 0 ? a / b : null);
+        return {
+            cpm: bagi(biaya, views) === null ? null : bagi(biaya, views) * 1000,
+            cpv: bagi(biaya, views),
+            cpc: bagi(biaya, klik),
+            cpe: bagi(biaya, interaksi),
+            er: bagi(interaksi, views) === null ? null : bagi(interaksi, views) * 100,
+            ctr: bagi(klik, views) === null ? null : bagi(klik, views) * 100
+        };
+    }
+
+    /**
+     * Harga wajar per konten = median views ÷ 1.000 × target CPM (rumus yang
+     * sama dengan "pagar harga" di KOL Panel). Median dipakai agar satu video
+     * viral tidak membuat harga terlihat murah.
+     *
+     * Status: wajar (≤ harga wajar), di-atas (≤ +ambang %), overprice (lebih
+     * dari itu), cek (belum ada views, tapi jauh di atas talent lain sejenis),
+     * tanpa-data.
+     */
+    function priceVerdict(talent, uploads, opts) {
+        const targetCpm = Number(opts && opts.targetCpm) || 0;
+        const ambang = Number(opts && opts.overpricePercent);
+        const batas = 1 + (isFinite(ambang) ? ambang : 50) / 100;
+        const harga = pricePerContent(talent);
+        const views = uploads
+            .filter(u => u.talentId === talent.id)
+            .map(u => numOrNull(u.views))
+            .filter(v => v !== null);
+
+        const res = {
+            harga, sampel: views.length, medianViews: median(views),
+            hargaWajar: null, rasio: null, status: 'tanpa-data', catatan: [], pembanding: null
+        };
+        if (harga === null || !harga) return res;
+
+        if (views.length && targetCpm > 0) {
+            res.hargaWajar = res.medianViews / 1000 * targetCpm;
+            res.rasio = res.hargaWajar > 0 ? harga / res.hargaWajar : Infinity;
+            res.status = res.rasio <= 1 ? 'wajar' : res.rasio <= batas ? 'di-atas' : 'overprice';
+            if (views.length < 3) {
+                res.catatan.push('Baru ' + views.length + ' konten punya data views; penilaian makin akurat bila datanya bertambah.');
+            }
+        }
+
+        const peers = (opts && opts.peerPrices || []).filter(x => x !== null && x > 0);
+        if (peers.length >= 2) {
+            const med = median(peers);
+            res.pembanding = med;
+            if (harga > 2 * med) {
+                res.catatan.push('Harga per konten ' + (harga / med).toFixed(1).replace('.', ',') +
+                    '× median talent lain dengan jenis konten yang sama.');
+                if (res.status === 'tanpa-data') res.status = 'cek';
+            }
+        }
+        return res;
+    }
+
+    // ------------------------------------------------------------------------
+    // Impor performa dari KOL Manager (sheet "Post" milik ekstensi KOL Panel)
+    // ------------------------------------------------------------------------
+
+    // Sheet KOL Manager berlokal Indonesia, jadi bentuk garis miring dibaca
+    // hari/bulan/tahun. Bentuk ISO dan nama bulan juga diterima.
+    function parseTanggalSheet(s) {
+        s = String(s || '').trim();
+        if (!s) return '';
+        let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return m[1] + '-' + m[2] + '-' + m[3];
+        m = s.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})/);
+        if (m) {
+            let d = +m[1], mo = +m[2];
+            if (mo > 12 && d <= 12) { const x = d; d = mo; mo = x; }
+            if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+            return rakitIso(m[3], mo, d);
+        }
+        return parseTanggalNotion(s);
+    }
+
+    function normHandle(s) {
+        return String(s || '').toLowerCase().replace(/^@/, '').replace(/[^a-z0-9]/g, '');
+    }
+
+    function sumOrNull(values) {
+        const xs = values.map(numOrNull).filter(v => v !== null);
+        return xs.length ? xs.reduce((a, b) => a + b, 0) : null;
+    }
+
+    function rowsFromKolCsv(teks) {
+        const baris = parseCSV(teks);
+        if (baris.length < 2) return { error: 'kosong', rows: [] };
+        const kepala = baris[0].map(h => String(h).trim().toLowerCase());
+        const i = n => kepala.indexOf(n);
+        if (i('post id') === -1 || i('views') === -1) return { error: 'kolom', header: baris[0], rows: [] };
+        const ambil = (r, n) => (i(n) === -1 ? '' : r[i(n)]);
+        const rows = baris.slice(1).map(r => ({
+            platform: String(ambil(r, 'platform')).trim(),
+            username: String(ambil(r, 'username')).trim(),
+            postId: String(ambil(r, 'post id')).trim(),
+            tgl: parseTanggalSheet(ambil(r, 'tanggal')),
+            views: numOrNull(ambil(r, 'views')),
+            interaksi: sumOrNull(['likes', 'comments', 'shares', 'saves', 'replies'].map(n => ambil(r, n)))
+        })).filter(r => r.postId);
+        return { rows };
+    }
+
+    /**
+     * Mencocokkan post dari sheet ke entri upload:
+     *  1. ID post tercantum di tautan upload (paling pasti);
+     *  2. akun talent = username sheet dan tanggal tayang sama.
+     * Satu konten yang di-mirror ke TikTok dan Instagram mendapat dua angka
+     * (satu per platform); views totalnya dijumlah.
+     */
+    function planKolImport(talents, uploads, rows) {
+        const cocok = [];
+        const tidakCocok = [];
+        const terpakai = new Set();
+        rows.forEach(r => {
+            const plat = r.platform || 'Lainnya';
+            let u = r.postId.length >= 5
+                ? uploads.find(x => x.link && x.link.indexOf(r.postId) !== -1)
+                : null;
+            let via = 'tautan';
+            if (!u && r.tgl) {
+                const h = normHandle(r.username);
+                const t = h && talents.find(x => normHandle(x.account) === h || normHandle(x.notionName) === h);
+                if (t) {
+                    u = uploads.find(x => x.talentId === t.id && x.date === r.tgl && !terpakai.has(x.id + '|' + plat));
+                    via = 'akun+tanggal';
+                }
+            }
+            if (!u) { tidakCocok.push(r); return; }
+            terpakai.add(u.id + '|' + plat);
+            cocok.push({ uploadId: u.id, platform: plat, postId: r.postId, views: r.views, interaksi: r.interaksi, via });
+        });
+        return { cocok, tidakCocok };
+    }
+
+    /** Menulis hasil pencocokan; views & interaksi = jumlah semua platform. */
+    function applyKolImport(uploads, plan, nowIso) {
+        plan.cocok.forEach(c => {
+            const u = uploads.find(x => x.id === c.uploadId);
+            if (!u) return;
+            u.perf = Object.assign({}, u.perf);
+            u.perf[c.platform] = { postId: c.postId, views: c.views, interaksi: c.interaksi, at: nowIso };
+            const per = Object.values(u.perf);
+            u.views = sumOrNull(per.map(p => p.views));
+            u.interaksi = sumOrNull(per.map(p => p.interaksi));
+        });
+        return uploads;
+    }
+
     root.PantauCore = {
+        numOrNull, median, monthOf, pricePerContent, monthlyLedger, paymentSchedule, costMetrics, priceVerdict,
+        parseTanggalSheet, rowsFromKolCsv, planKolImport, applyKolImport,
         parseIso, addDays, daysBetween, uploadDaysOf, buildSchedule, talentMetrics,
         parseTanggalNotion, parseCSV, normalizeNotionId, rowsFromNotionCsv,
         planNotionImport, findDuplicateUploads, uploadDatesOf,

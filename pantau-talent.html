@@ -1513,6 +1513,29 @@
         .mini-cal-day:disabled { opacity: .3; cursor: default; }
         .mini-cal-day.active { background-color: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
 
+        /* ---------------- Biaya & performa ---------------- */
+        .biaya-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-md); margin-bottom: var(--spacing-lg); }
+        .biaya-toolbar .field-label { margin: 0; }
+        .biaya-table th, .biaya-table td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .biaya-table .left { text-align: left; white-space: normal; min-width: 160px; }
+        .biaya-table .is-current { background-color: var(--accent-wash); }
+        .biaya-table tfoot th { border-top: 2px solid var(--line); }
+        .biaya-matrix-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--spacing-md); }
+        .summary-value small { font-size: 14px; color: var(--txt-muted); }
+        .price-badge {
+            display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm);
+            font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+        }
+        .price-badge.ok { color: var(--ok); background-color: var(--ok-bg); }
+        .price-badge.warn { color: var(--warn); background-color: var(--warn-bg); }
+        .price-badge.danger { color: var(--danger); background-color: var(--danger-bg); }
+        .price-badge.muted { color: var(--txt-muted); background-color: var(--surface-2); }
+        .price-note { margin-top: 4px; font-size: 12px; color: var(--txt-muted); white-space: normal; max-width: 420px; }
+        .calc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--spacing-lg); }
+        .calc-hint { display: block; font-size: 11px; color: var(--txt-muted); margin-top: 2px; }
+        .calc-verdict { margin-top: var(--spacing-md); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-sm); }
+        @media (max-width: 768px) { .calc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
         .talent-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .talent-card-platform.is-missing { color: var(--warn); background-color: var(--warn-bg); }
 
@@ -1672,6 +1695,7 @@
             <button class="tab-button active" data-tab="today" role="tab" aria-selected="true" aria-controls="today">Hari Ini</button>
             <button class="tab-button" data-tab="talent" role="tab" aria-selected="false" aria-controls="talent">Talent</button>
             <button class="tab-button" data-tab="kalender" role="tab" aria-selected="false" aria-controls="kalender">Kalender</button>
+            <button class="tab-button" data-tab="biaya" role="tab" aria-selected="false" aria-controls="biaya">Biaya &amp; Performa</button>
             <button class="tab-button" data-tab="data" role="tab" aria-selected="false" aria-controls="data">Data Kontrak</button>
             <button class="tab-button" data-tab="settings" role="tab" aria-selected="false" aria-controls="settings">Ambang Peringatan</button>
         </div>
@@ -1721,6 +1745,7 @@
                 <button class="button button-primary" id="exportBtn">⬇ Unduh Cadangan</button>
                 <button class="button button-secondary" id="importBtn">⬆ Pulihkan Cadangan</button>
                 <button class="button button-secondary" id="csvNotionBtn">↻ Tarik Riwayat dari Notion (CSV)</button>
+                <button class="button button-secondary" id="csvKolBtn" title="CSV dari sheet Post di KOL Manager (ekstensi KOL Panel)">📈 Impor Performa dari KOL Panel (CSV)</button>
                 <button class="button button-secondary button-small" id="syncNotionBtn" title="Perlu setelan token di server">Tarik langsung (perlu setelan)</button>
             </div>
             <div id="duplicateNotice"></div>
@@ -1740,6 +1765,52 @@
                     <tbody id="dataTableBody">
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- TAB: BIAYA & PERFORMA -->
+        <div id="biaya" class="tab-content" role="tabpanel">
+            <div class="biaya-toolbar">
+                <label class="field-label" for="biayaMonth">Bulan</label>
+                <select class="talent-filter" id="biayaMonth"></select>
+                <button type="button" class="button button-secondary button-small" id="biayaExportBtn">⬇ Unduh rekap CSV</button>
+            </div>
+            <div id="biayaContainer"></div>
+
+            <div class="form-section-title">Kalkulator CPM / CPV / CPC</div>
+            <p class="form-section-note">Isi biaya dan hasil yang didapat. Pilih talent untuk mengisi otomatis dari data kontrak dan upload yang tercatat.</p>
+            <div class="card calc-card">
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Isi dari talent</div>
+                        <select id="calcTalent"><option value="">— isi manual —</option></select>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Biaya (Rp)</div>
+                        <input type="text" inputmode="numeric" id="calcBiaya" placeholder="mis. 600.000">
+                    </div>
+                </div>
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Views</div>
+                        <input type="text" inputmode="numeric" id="calcViews" placeholder="total views">
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Klik (link/keranjang)</div>
+                        <input type="text" inputmode="numeric" id="calcKlik" placeholder="opsional">
+                    </div>
+                </div>
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Interaksi (like+komen+share)</div>
+                        <input type="text" inputmode="numeric" id="calcInteraksi" placeholder="opsional">
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Jumlah konten</div>
+                        <input type="text" inputmode="numeric" id="calcKonten" placeholder="untuk harga wajar per konten">
+                    </div>
+                </div>
+                <div class="calc-results" id="calcResults" aria-live="polite"></div>
             </div>
         </div>
 
@@ -1773,6 +1844,27 @@
                             <div class="field-label">Tertinggal dari target (jumlah konten)</div>
                             <input type="number" id="behindThreshold" min="1" max="100" value="2">
                             <div class="setting-description">Peringatan jika tertinggal N konten atau lebih dari target</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section-title" style="border-top: none; padding-top: var(--spacing-xl);">Patokan Harga</div>
+            <p class="form-section-note">Dipakai untuk menilai apakah harga kontrak wajar. Harga wajar per konten = median views &divide; 1.000 &times; target CPM — rumus yang sama dengan pagar harga di KOL Panel.</p>
+            <div class="card">
+                <div class="card-row">
+                    <div class="setting-item">
+                        <div class="field">
+                            <div class="field-label">Target CPM (Rp per 1.000 views)</div>
+                            <input type="number" id="targetCpm" min="1" value="100000">
+                            <div class="setting-description">Biaya maksimal yang Anda anggap wajar untuk setiap 1.000 views</div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="field">
+                            <div class="field-label">Batas overprice (% di atas harga wajar)</div>
+                            <input type="number" id="overpricePercent" min="0" max="500" value="50">
+                            <div class="setting-description">Di atas harga wajar tapi di bawah batas ini = "di atas target"; melewatinya = "overprice"</div>
                         </div>
                     </div>
                 </div>
@@ -2015,6 +2107,22 @@
                     <div class="field-label">Tautan</div>
                     <input type="url" id="recordUploadLink" placeholder="https://..." required>
                 </div>
+                <div class="form-section-title">Performa (opsional)</div>
+                <p class="form-section-note">Boleh dikosongkan. Kosong berarti belum ada data, bukan nol. Bisa juga diisi otomatis lewat impor dari KOL Panel di tab Data Kontrak.</p>
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Views</div>
+                        <input type="text" inputmode="numeric" id="recordUploadViews" placeholder="total semua platform">
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Interaksi</div>
+                        <input type="text" inputmode="numeric" id="recordUploadInteraksi" placeholder="like + komen + share">
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Klik</div>
+                        <input type="text" inputmode="numeric" id="recordUploadKlik" placeholder="klik link/keranjang">
+                    </div>
+                </div>
                 <div class="button-group">
                     <button type="submit" class="button button-primary" id="recordUploadSubmit">Simpan Upload</button>
                     <button type="button" class="button button-secondary" id="cancelRecordBtn">Batal</button>
@@ -2063,6 +2171,7 @@
     <!-- Hidden input untuk import file -->
     <input type="file" id="importFile" accept=".json" style="display: none;">
     <input type="file" id="csvNotionFile" accept=".csv,text/csv" style="display: none;">
+    <input type="file" id="csvKolFile" accept=".csv,text/csv" style="display: none;">
 
     <script src="data/pantau-core.js"></script>
     <script>
@@ -2087,7 +2196,9 @@
             companyRep: 'Panca pebriansyah',
             companySignBrand: 'Senovshop',
             publishAccount: 'Senovshop',
-            dpPercent: 30
+            dpPercent: 30,
+            targetCpm: 100000,
+            overpricePercent: 50
         };
 
         // Initialize data. Missing keys are backfilled so a backup written by an
@@ -2129,7 +2240,7 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         }
 
-        const NUMBER_SETTINGS = ['lowQuotaVideos', 'lowQuotaPercent', 'contractEndingSoon', 'behindThreshold', 'dpPercent'];
+        const NUMBER_SETTINGS = ['lowQuotaVideos', 'lowQuotaPercent', 'contractEndingSoon', 'behindThreshold', 'dpPercent', 'targetCpm', 'overpricePercent'];
         const TEXT_SETTINGS = ['letterheadName', 'letterheadAddress', 'letterheadEmail', 'letterheadPhone',
                                'companyName', 'companyAddress', 'companyRep', 'companySignBrand', 'publishAccount'];
 
@@ -2615,6 +2726,10 @@
                                 <div class="field">
                                     <div class="field-label">Tertinggal / jadwal terlewat</div>
                                     <div class="field-value" data-metric="behind">${m.behind ? m.behind + ' slot lewat tanpa upload' : 'Tidak ada'}</div>
+                                </div>
+                                <div class="field" data-card-price>
+                                    <div class="field-label">Harga per ${PantauCore.contentTypeOf(talent).unit}</div>
+                                    <div class="field-value">${(() => { const v = penilaianHarga(talent); const cat = catatanHarga(v, PantauCore.contentTypeOf(talent).unit); return rupiahAtauKosong(v.harga) + ' ' + lencanaHarga(v) + (cat ? `<div class="price-note">${cat}</div>` : ''); })()}</div>
                                 </div>
                                 <div class="field">
                                     <div class="field-label">DP</div>
@@ -3262,6 +3377,10 @@
             document.getElementById('recordUploadTitle').value = ada ? (ada.title || '') : '';
             document.getElementById('recordUploadLink').value = ada ? (ada.link || '') : '';
             document.getElementById('recordUploadLink').required = !ada;
+            const angkaAtauKosong = v => (v === null || v === undefined ? '' : String(v));
+            document.getElementById('recordUploadViews').value = ada ? angkaAtauKosong(ada.views) : '';
+            document.getElementById('recordUploadInteraksi').value = ada ? angkaAtauKosong(ada.interaksi) : '';
+            document.getElementById('recordUploadKlik').value = ada ? angkaAtauKosong(ada.klik) : '';
 
             if (ada) form.dataset.uploadId = ada.id; else delete form.dataset.uploadId;
             document.getElementById('recordUploadModal').classList.add('active');
@@ -3274,7 +3393,10 @@
             const isian = {
                 date: document.getElementById('recordUploadDate').value,
                 title: document.getElementById('recordUploadTitle').value.trim(),
-                link: document.getElementById('recordUploadLink').value.trim()
+                link: document.getElementById('recordUploadLink').value.trim(),
+                views: PantauCore.numOrNull(document.getElementById('recordUploadViews').value),
+                interaksi: PantauCore.numOrNull(document.getElementById('recordUploadInteraksi').value),
+                klik: PantauCore.numOrNull(document.getElementById('recordUploadKlik').value)
             };
 
             const ada = form.dataset.uploadId ? state.uploads.find(u => u.id === form.dataset.uploadId) : null;
@@ -4142,6 +4264,356 @@
         });
 
         // ============================================================================
+        // BIAYA & PERFORMA
+        // ============================================================================
+        //
+        // Satu tempat untuk: biaya per talent per bulan, jadwal DP/pelunasan,
+        // CPM/CPV/CPC aktual, dan penilaian harga (wajar / di atas target /
+        // overprice). Semua angka dihitung dari data kontrak dan upload yang
+        // sama dengan tab lain, lewat PantauCore.
+
+        const STATUS_HARGA = {
+            'wajar': { label: 'Harga wajar', cls: 'ok' },
+            'di-atas': { label: 'Di atas target', cls: 'warn' },
+            'overprice': { label: 'Overprice', cls: 'danger' },
+            'cek': { label: 'Perlu dicek', cls: 'warn' },
+            'tanpa-data': { label: 'Belum ada data views', cls: 'muted' }
+        };
+
+        function rupiahAtauKosong(n) {
+            return n === null || n === undefined || !isFinite(n) ? '<span class="text-muted">&mdash;</span>' : formatCurrency(Math.round(n));
+        }
+
+        function angka(n) {
+            return n === null || n === undefined ? '<span class="text-muted">&mdash;</span>' : new Intl.NumberFormat('id-ID').format(Math.round(n));
+        }
+
+        function namaBulan(ym) {
+            const [y, m] = ym.split('-').map(Number);
+            return new Date(y, m - 1, 1).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        }
+
+        function penilaianHarga(talent) {
+            const jenis = PantauCore.contentTypeOf(talent).id;
+            const peerPrices = state.talents
+                .filter(t => t.id !== talent.id && PantauCore.contentTypeOf(t).id === jenis)
+                .map(PantauCore.pricePerContent);
+            return PantauCore.priceVerdict(talent, state.uploads, {
+                targetCpm: state.setelan.targetCpm,
+                overpricePercent: state.setelan.overpricePercent,
+                peerPrices
+            });
+        }
+
+        function lencanaHarga(v) {
+            const st = STATUS_HARGA[v.status];
+            return `<span class="price-badge ${st.cls}" data-price-status="${v.status}">${st.label}</span>`;
+        }
+
+        // Kalimat penjelasan untuk kartu talent dan tabel.
+        function catatanHarga(v, unit) {
+            const bagian = [];
+            if (v.hargaWajar !== null) {
+                bagian.push(`Harga ${formatCurrency(Math.round(v.harga))}/${unit}; wajar ±${formatCurrency(Math.round(v.hargaWajar))} ` +
+                    `(median ${new Intl.NumberFormat('id-ID').format(Math.round(v.medianViews))} views, CPM ${formatCurrency(state.setelan.targetCpm)}).`);
+                if (v.rasio > 1 && isFinite(v.rasio)) bagian.push(`Lebih mahal ${Math.round((v.rasio - 1) * 100)}% dari harga wajar.`);
+            }
+            if (v.pembanding !== null && v.status !== 'tanpa-data' && !v.catatan.length && v.hargaWajar === null) {
+                bagian.push(`Median talent lain sejenis ${formatCurrency(Math.round(v.pembanding))}/${unit}.`);
+            }
+            return bagian.concat(v.catatan).map(escapeHtml).join(' ');
+        }
+
+        // Rentang bulan: dari kontrak paling awal sampai paling akhir (maks. 12,
+        // dipusatkan di sekitar bulan berjalan).
+        function daftarBulanBiaya() {
+            const set = new Set([PantauCore.monthOf(todayIso())]);
+            state.talents.forEach(t => {
+                if (t.startDate && t.endDate) {
+                    for (let m = PantauCore.monthOf(t.startDate); m <= PantauCore.monthOf(t.endDate); ) {
+                        set.add(m);
+                        const [y, mm] = m.split('-').map(Number);
+                        m = mm === 12 ? (y + 1) + '-01' : y + '-' + String(mm + 1).padStart(2, '0');
+                    }
+                }
+            });
+            state.uploads.forEach(u => u.date && set.add(PantauCore.monthOf(u.date)));
+            const semua = [...set].sort();
+            const kini = semua.indexOf(PantauCore.monthOf(todayIso()));
+            const mulai = Math.max(0, Math.min(kini - 8, semua.length - 12));
+            return semua.slice(mulai, mulai + 12);
+        }
+
+        function rekapBiaya() {
+            const ledger = PantauCore.monthlyLedger(state.talents, state.uploads);
+            const bayar = {};
+            state.talents.forEach(t => {
+                bayar[t.id] = {};
+                PantauCore.paymentSchedule(t, effectiveDp(t)).forEach(p => {
+                    (bayar[t.id][p.month] = bayar[t.id][p.month] || []).push(p);
+                });
+            });
+            return { ledger, bayar };
+        }
+
+        function renderBiayaTab() {
+            const container = document.getElementById('biayaContainer');
+            if (!container) return;
+            const pilih = document.getElementById('biayaMonth');
+            const bulan = daftarBulanBiaya();
+            const terpilih = pilih.value && bulan.indexOf(pilih.value) !== -1 ? pilih.value : PantauCore.monthOf(todayIso());
+            pilih.innerHTML = bulan.map(m => `<option value="${m}"${m === terpilih ? ' selected' : ''}>${namaBulan(m)}</option>`).join('');
+
+            isiPilihanKalkulator();
+
+            if (!state.talents.length) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-title">Belum ada talent</div></div>';
+                return;
+            }
+
+            const { ledger, bayar } = rekapBiaya();
+            let totBiaya = 0, totKas = 0, totKonten = 0, totBonus = 0, totViews = 0, biayaBerviews = 0, totKlik = 0, biayaBerklik = 0;
+
+            const baris = state.talents.map(t => {
+                const a = (ledger[t.id] || {})[terpilih] || null;
+                const kas = (bayar[t.id] || {})[terpilih] || [];
+                const kasJumlah = kas.reduce((s, p) => s + p.jumlah, 0);
+                const v = penilaianHarga(t);
+                const unit = PantauCore.contentTypeOf(t).unit;
+                const harga = PantauCore.pricePerContent(t);
+                const biaya = a ? a.biaya : 0;
+                // CPM/CPC hanya dari konten yang punya datanya, agar konten
+                // tanpa views tidak membuat CPM terlihat lebih mahal.
+                const perKonten = harga || 0;
+                const met = a ? {
+                    cpm: PantauCore.costMetrics({ biaya: perKonten * a.denganViews, views: a.denganViews ? a.views : null }).cpm,
+                    cpc: PantauCore.costMetrics({ biaya: perKonten * a.denganKlik, klik: a.denganKlik ? a.klik : null }).cpc
+                } : { cpm: null, cpc: null };
+
+                totBiaya += biaya; totKas += kasJumlah;
+                if (a) {
+                    totKonten += a.konten; totBonus += a.bonus;
+                    if (a.denganViews) { totViews += a.views; biayaBerviews += perKonten * a.denganViews; }
+                    if (a.denganKlik) { totKlik += a.klik; biayaBerklik += perKonten * a.denganKlik; }
+                }
+
+                return {
+                    t, a, kas, kasJumlah, v, unit, harga, biaya, met,
+                    html: `
+                    <tr data-biaya-talent="${t.id}">
+                        <td class="left"><strong>${escapeHtml(t.name)}</strong><div class="text-muted">@${escapeHtml(t.account)} &middot; ${PantauCore.contentTypeOf(t).label}</div></td>
+                        <td>${rupiahAtauKosong(harga)}</td>
+                        <td>${a ? a.konten + (a.bonus ? ` <span class="text-muted">+${a.bonus} bonus</span>` : '') : 0}</td>
+                        <td data-col="biaya">${formatCurrency(Math.round(biaya))}</td>
+                        <td>${kas.length ? kas.map(p => `${p.jenis} ${formatCurrency(p.jumlah)}`).join('<br>') : '<span class="text-muted">&mdash;</span>'}</td>
+                        <td>${a && a.denganViews ? angka(a.views) : '<span class="text-muted">&mdash;</span>'}</td>
+                        <td data-col="cpm">${rupiahAtauKosong(met.cpm)}</td>
+                        <td>${rupiahAtauKosong(met.cpc)}</td>
+                        <td class="left">${lencanaHarga(v)}${catatanHarga(v, unit) ? `<div class="price-note">${catatanHarga(v, unit)}</div>` : ''}</td>
+                    </tr>`
+                };
+            });
+
+            const cpmBulan = PantauCore.costMetrics({ biaya: biayaBerviews, views: totViews || null }).cpm;
+            const cpcBulan = PantauCore.costMetrics({ biaya: biayaBerklik, klik: totKlik || null }).cpc;
+            const mahal = baris.filter(b => b.v.status === 'overprice' || b.v.status === 'di-atas' || b.v.status === 'cek');
+
+            let html = `
+                <div class="summary-grid" aria-label="Ringkasan ${namaBulan(terpilih)}">
+                    <div class="summary-card"><span class="summary-value" data-summary="biaya">${formatCurrency(Math.round(totBiaya))}</span><span class="summary-label">Biaya konten tayang</span></div>
+                    <div class="summary-card"><span class="summary-value" data-summary="kas">${formatCurrency(totKas)}</span><span class="summary-label">Jadwal bayar (DP + pelunasan)</span></div>
+                    <div class="summary-card"><span class="summary-value">${totKonten}${totBonus ? `<small> +${totBonus}</small>` : ''}</span><span class="summary-label">Konten tayang${totBonus ? ' (+bonus)' : ''}</span></div>
+                    <div class="summary-card"><span class="summary-value">${cpmBulan === null ? '&mdash;' : formatCurrency(Math.round(cpmBulan))}</span><span class="summary-label">CPM bulan ini${cpcBulan !== null ? ' &middot; CPC ' + formatCurrency(Math.round(cpcBulan)) : ''}</span></div>
+                </div>`;
+
+            if (mahal.length) {
+                html += `<div class="alert-group-title">Catatan harga</div>` + mahal.map(b => `
+                    <div class="alert-item ${b.v.status === 'overprice' ? 'overdue' : 'low'}">
+                        <div class="alert-item-content">
+                            <div class="alert-item-title">${escapeHtml(b.t.name)} ${lencanaHarga(b.v)}</div>
+                            <div class="alert-item-detail">${catatanHarga(b.v, b.unit)}</div>
+                        </div>
+                    </div>`).join('');
+            }
+
+            html += `
+                <div class="form-section-title">Per talent &middot; ${namaBulan(terpilih)}</div>
+                <div class="table-wrapper">
+                    <table class="biaya-table">
+                        <thead><tr>
+                            <th class="left">Talent</th><th>Harga/konten</th><th>Tayang</th><th>Biaya konten</th>
+                            <th>Jadwal bayar</th><th>Views</th><th>CPM</th><th>CPC</th><th class="left">Penilaian harga</th>
+                        </tr></thead>
+                        <tbody>${baris.map(b => b.html).join('')}</tbody>
+                    </table>
+                </div>`;
+
+            // Matriks talent × bulan: jawaban "berapa yang keluar tiap bulan".
+            const mode = document.getElementById('biayaMatrixMode') ? document.getElementById('biayaMatrixMode').value : 'konten';
+            const sel = (m, t) => mode === 'kas'
+                ? ((bayar[t.id] || {})[m] || []).reduce((s, p) => s + p.jumlah, 0)
+                : (((ledger[t.id] || {})[m]) || { biaya: 0 }).biaya;
+            const totalKolom = bulan.map(m => state.talents.reduce((s, t) => s + sel(m, t), 0));
+
+            html += `
+                <div class="form-section-title biaya-matrix-head">
+                    <span>Pengeluaran per bulan</span>
+                    <select class="talent-filter" id="biayaMatrixMode" aria-label="Jenis angka">
+                        <option value="konten"${mode === 'konten' ? ' selected' : ''}>Biaya konten tayang</option>
+                        <option value="kas"${mode === 'kas' ? ' selected' : ''}>Jadwal bayar (DP + pelunasan)</option>
+                    </select>
+                </div>
+                <div class="table-wrapper">
+                    <table class="biaya-table" id="biayaMatrix">
+                        <thead><tr><th class="left">Talent</th>${bulan.map(m => `<th${m === terpilih ? ' class="is-current"' : ''}>${namaBulan(m).replace(/ \d{4}$/, '').slice(0, 3)} ${m.slice(2, 4)}</th>`).join('')}<th>Total</th><th>Nilai kontrak</th></tr></thead>
+                        <tbody>
+                            ${state.talents.map(t => {
+                                const sel2 = bulan.map(m => sel(m, t));
+                                return `<tr><td class="left">${escapeHtml(t.name)}</td>${sel2.map((x, i) => `<td${bulan[i] === terpilih ? ' class="is-current"' : ''}>${x ? formatCurrency(Math.round(x)) : '<span class="text-muted">&middot;</span>'}</td>`).join('')}<td><strong>${formatCurrency(Math.round(sel2.reduce((s, x) => s + x, 0)))}</strong></td><td>${formatCurrency(Number(t.value) || 0)}</td></tr>`;
+                            }).join('')}
+                        </tbody>
+                        <tfoot><tr><th class="left">Total</th>${totalKolom.map((x, i) => `<th${bulan[i] === terpilih ? ' class="is-current"' : ''}>${formatCurrency(Math.round(x))}</th>`).join('')}<th>${formatCurrency(Math.round(totalKolom.reduce((s, x) => s + x, 0)))}</th><th>${formatCurrency(state.talents.reduce((s, t) => s + (Number(t.value) || 0), 0))}</th></tr></tfoot>
+                    </table>
+                </div>
+                <p class="form-section-note">Biaya konten = harga per konten &times; konten yang tayang bulan itu (konten di atas kuota dihitung bonus, Rp0). Jadwal bayar mengikuti surat kontrak: DP di bulan mulai, pelunasan di bulan berakhir.</p>`;
+
+            container.innerHTML = html;
+            document.getElementById('biayaMatrixMode').addEventListener('change', renderBiayaTab);
+            hitungKalkulator();
+        }
+
+        document.getElementById('biayaMonth').addEventListener('change', renderBiayaTab);
+
+        // ---- Unduh rekap sebagai CSV (dibuka di Excel / Google Sheets) -------
+        document.getElementById('biayaExportBtn').addEventListener('click', () => {
+            const { ledger, bayar } = rekapBiaya();
+            const bulan = daftarBulanBiaya();
+            const kutip = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+            const baris = [['Talent', 'Akun', 'Jenis konten', 'Bulan', 'Harga per konten', 'Konten tayang', 'Bonus', 'Biaya konten', 'Jadwal bayar', 'Views', 'Interaksi', 'Klik', 'CPM', 'CPC', 'Penilaian harga']];
+            state.talents.forEach(t => {
+                const v = penilaianHarga(t);
+                const harga = PantauCore.pricePerContent(t) || 0;
+                bulan.forEach(m => {
+                    const a = (ledger[t.id] || {})[m];
+                    const kas = ((bayar[t.id] || {})[m] || []).reduce((s, p) => s + p.jumlah, 0);
+                    if (!a && !kas) return;
+                    const cpm = a && a.denganViews ? PantauCore.costMetrics({ biaya: harga * a.denganViews, views: a.views }).cpm : null;
+                    const cpc = a && a.denganKlik ? PantauCore.costMetrics({ biaya: harga * a.denganKlik, klik: a.klik }).cpc : null;
+                    baris.push([t.name, t.account, PantauCore.contentTypeOf(t).label, m, Math.round(harga),
+                        a ? a.konten : 0, a ? a.bonus : 0, a ? Math.round(a.biaya) : 0, kas,
+                        a && a.denganViews ? a.views : '', a && a.denganInteraksi ? a.interaksi : '', a && a.denganKlik ? a.klik : '',
+                        cpm === null ? '' : Math.round(cpm), cpc === null ? '' : Math.round(cpc), STATUS_HARGA[v.status].label]);
+                });
+            });
+            const blob = new Blob(['﻿' + baris.map(r => r.map(kutip).join(',')).join('\n')], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `rekap-biaya-talent-${todayIso()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // ---- Kalkulator --------------------------------------------------
+        function isiPilihanKalkulator() {
+            const sel = document.getElementById('calcTalent');
+            const kini = sel.value;
+            sel.innerHTML = '<option value="">— isi manual —</option>' +
+                state.talents.map(t => `<option value="${t.id}"${t.id === kini ? ' selected' : ''}>${escapeHtml(t.name)}</option>`).join('');
+        }
+
+        function hitungKalkulator() {
+            const val = id => PantauCore.numOrNull(document.getElementById(id).value);
+            const biaya = val('calcBiaya'), views = val('calcViews'), klik = val('calcKlik'),
+                interaksi = val('calcInteraksi'), konten = val('calcKonten');
+            const m = PantauCore.costMetrics({ biaya, views, klik, interaksi });
+            const target = Number(state.setelan.targetCpm) || 0;
+            const viewsPerKonten = views !== null && konten ? views / konten : null;
+            const wajar = viewsPerKonten !== null && target ? viewsPerKonten / 1000 * target : null;
+            const hargaPerKonten = biaya !== null && konten ? biaya / konten : null;
+            const batas = 1 + (Number(state.setelan.overpricePercent) || 0) / 100;
+
+            let vonis = '';
+            if (wajar !== null && hargaPerKonten !== null) {
+                const r = wajar > 0 ? hargaPerKonten / wajar : Infinity;
+                const st = r <= 1 ? 'wajar' : r <= batas ? 'di-atas' : 'overprice';
+                vonis = `<div class="calc-verdict">${lencanaHarga({ status: st })} Harga ${formatCurrency(Math.round(hargaPerKonten))}/konten vs wajar ${formatCurrency(Math.round(wajar))}` +
+                    (r > 1 && isFinite(r) ? ` &middot; ${Math.round((r - 1) * 100)}% lebih mahal` : '') + `</div>`;
+            }
+
+            const kotak = (label, nilai, ket, key) => `<div class="summary-card"><span class="summary-value" data-calc="${key}">${nilai}</span><span class="summary-label">${label}</span>${ket ? `<span class="calc-hint">${ket}</span>` : ''}</div>`;
+            document.getElementById('calcResults').innerHTML = `
+                <div class="summary-grid calc-grid">
+                    ${kotak('CPM', rupiahAtauKosong(m.cpm), 'biaya per 1.000 views', 'cpm')}
+                    ${kotak('CPV', rupiahAtauKosong(m.cpv), 'biaya per view', 'cpv')}
+                    ${kotak('CPC', rupiahAtauKosong(m.cpc), 'biaya per klik', 'cpc')}
+                    ${kotak('CPE', rupiahAtauKosong(m.cpe), 'biaya per interaksi', 'cpe')}
+                    ${kotak('ER', m.er === null ? '&mdash;' : m.er.toFixed(2).replace('.', ',') + '%', 'interaksi &divide; views', 'er')}
+                    ${kotak('CTR', m.ctr === null ? '&mdash;' : m.ctr.toFixed(2).replace('.', ',') + '%', 'klik &divide; views', 'ctr')}
+                </div>
+                ${vonis}
+                <p class="form-section-note">Target CPM sekarang ${formatCurrency(target)} &mdash; ubah di tab Ambang Peringatan.</p>`;
+        }
+
+        ['calcBiaya', 'calcViews', 'calcKlik', 'calcInteraksi', 'calcKonten'].forEach(id => {
+            document.getElementById(id).addEventListener('input', hitungKalkulator);
+        });
+
+        // Pilih talent → isi biaya konten yang sudah tayang dan hasilnya.
+        document.getElementById('calcTalent').addEventListener('change', e => {
+            const t = state.talents.find(x => x.id === e.target.value);
+            if (!t) return;
+            const harga = PantauCore.pricePerContent(t) || 0;
+            const own = state.uploads.filter(u => u.talentId === t.id)
+                .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.id).localeCompare(String(b.id)));
+            // Konten di atas kuota adalah bonus: ikut views-nya, tidak ikut biayanya.
+            const dibayar = new Set(own.slice(0, parseInt(t.quota, 10) || 0).map(u => u.id));
+            const dgnViews = own.filter(u => PantauCore.numOrNull(u.views) !== null);
+            const pakai = dgnViews.length ? dgnViews : own;
+            const jumlah = (list, f) => list.reduce((s, u) => s + (PantauCore.numOrNull(u[f]) || 0), 0);
+            const set = (id, v) => { document.getElementById(id).value = v === null ? '' : String(Math.round(v)); };
+            set('calcKonten', pakai.length || null);
+            set('calcBiaya', harga * pakai.filter(u => dibayar.has(u.id)).length || null);
+            set('calcViews', dgnViews.length ? jumlah(dgnViews, 'views') : null);
+            set('calcInteraksi', own.some(u => PantauCore.numOrNull(u.interaksi) !== null) ? jumlah(dgnViews, 'interaksi') : null);
+            set('calcKlik', own.some(u => PantauCore.numOrNull(u.klik) !== null) ? jumlah(dgnViews, 'klik') : null);
+            hitungKalkulator();
+        });
+
+        // ---- Impor performa dari KOL Panel (sheet "Post" di KOL Manager) ----
+        function importCsvKol(teks) {
+            const hasil = PantauCore.rowsFromKolCsv(teks);
+            if (hasil.error === 'kosong') { alert('Berkas CSV kosong atau tidak terbaca.'); return; }
+            if (hasil.error === 'kolom') {
+                alert('Kolom "Post ID" atau "Views" tidak ada.\n\nKolom yang terbaca:\n' + hasil.header.join(', ') +
+                      '\n\nUnduh sheet "Post" dari KOL Manager: File > Download > CSV.');
+                return;
+            }
+            const rencana = PantauCore.planKolImport(state.talents, state.uploads, hasil.rows);
+            if (rencana.cocok.length) {
+                PantauCore.applyKolImport(state.uploads, rencana, new Date().toISOString());
+                saveData();
+                render();
+            }
+            alert(rencana.cocok.length + ' post dicocokkan ke riwayat upload, views & interaksinya diperbarui.' +
+                (rencana.tidakCocok.length
+                    ? '\n\n' + rencana.tidakCocok.length + ' post tidak menemukan pasangan. Pastikan tautan upload berisi ID post-nya, atau nama akun talent sama dengan username di sheet dan tanggal tayangnya sama.'
+                    : ''));
+            return rencana;
+        }
+
+        document.getElementById('csvKolBtn').addEventListener('click', () => document.getElementById('csvKolFile').click());
+        document.getElementById('csvKolFile').addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const r = new FileReader();
+            r.onload = ev => importCsvKol(ev.target.result);
+            r.onerror = () => alert('Gagal membaca berkas.');
+            r.readAsText(f);
+            e.target.value = '';
+        });
+
+        // ============================================================================
         // RENDER FUNCTION
         // ============================================================================
 
@@ -4151,6 +4623,7 @@
             renderKalenderTab();
             renderDataTab();
             loadSettings();
+            renderBiayaTab();
         }
 
         // ============================================================================
