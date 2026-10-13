@@ -649,6 +649,22 @@
         };
         if (harga === null || !harga) return res;
 
+        // Belum ada views per upload, tapi ada analitik ringkas yang disimpan
+        // dari kalkulator (total views ÷ jumlah konten). Dipakai sebagai
+        // rata-rata per konten; ditandai supaya jelas sumbernya.
+        const ringkas = opts && opts.snapshot;
+        if (!views.length && ringkas && numOrNull(ringkas.views) !== null && numOrNull(ringkas.konten) > 0) {
+            res.sumber = 'analitik';
+            res.sampel = numOrNull(ringkas.konten);
+            res.medianViews = numOrNull(ringkas.views) / numOrNull(ringkas.konten);
+            if (targetCpm > 0) {
+                res.hargaWajar = res.medianViews / 1000 * targetCpm;
+                res.rasio = res.hargaWajar > 0 ? harga / res.hargaWajar : Infinity;
+                res.status = res.rasio <= 1 ? 'wajar' : res.rasio <= batas ? 'di-atas' : 'overprice';
+            }
+            res.catatan.push('Dari analitik tersimpan ' + (ringkas.tanggal || '') + ' (rata-rata ' + res.sampel + ' konten).');
+        }
+
         if (views.length && targetCpm > 0) {
             res.hargaWajar = res.medianViews / 1000 * targetCpm;
             res.rasio = res.hargaWajar > 0 ? harga / res.hargaWajar : Infinity;

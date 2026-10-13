@@ -268,3 +268,70 @@ describe("entri upload menyimpan performa", () => {
     expect(simpanan(dom).uploads[0]).toMatchObject({ views: 12500, klik: 40, interaksi: null });
   });
 });
+
+describe("analitik tersimpan dari kalkulator", () => {
+  const ACHMAD = { ...TAUFIK, id: "t9", name: "Achmad", account: "LOXINS", quota: 8, value: 480000, contentType: "video" };
+
+  function isiKalkulator(dom) {
+    const doc = dom.window.document;
+    const sel = doc.getElementById("calcTalent");
+    sel.value = "t9";
+    sel.dispatchEvent(new dom.window.Event("change"));
+    const isi = (id, v) => { doc.getElementById(id).value = v; doc.getElementById(id).dispatchEvent(new dom.window.Event("input")); };
+    isi("calcBiaya", "480000");
+    isi("calcViews", "147539");
+    isi("calcKlik", "132");
+    isi("calcInteraksi", "8,059");
+    isi("calcKonten", "8");
+  }
+
+  it("tanpa talent dipilih tidak menyimpan", () => {
+    const dom = bukaHalaman([ACHMAD], []);
+    const doc = dom.window.document;
+    doc.getElementById("calcViews").value = "1000";
+    doc.getElementById("calcSaveBtn").click();
+    expect(simpanan(dom).talents[0].analitik).toBeUndefined();
+    expect(doc.getElementById("calcSaveMsg").textContent).toMatch(/Pilih talent/);
+  });
+
+  it("menyimpan angka + hasil hitung ke talent dan tampil di daftar", () => {
+    const dom = bukaHalaman([ACHMAD], []);
+    const doc = dom.window.document;
+    isiKalkulator(dom);
+    doc.getElementById("calcSaveBtn").click();
+
+    const a = simpanan(dom).talents[0].analitik[0];
+    expect(a).toMatchObject({ tanggal: "2026-10-12", biaya: 480000, views: 147539, klik: 132, interaksi: 8059, konten: 8 });
+    expect(Math.round(a.cpm)).toBe(3253);
+    expect(Math.round(a.cpc)).toBe(3636);
+    expect(doc.querySelectorAll("#analitikTable [data-analitik]")).toHaveLength(1);
+  });
+
+  it("analitik terbaru dipakai menilai harga bila belum ada views per upload", () => {
+    const dom = bukaHalaman([ACHMAD], []);
+    const doc = dom.window.document;
+    expect(doc.querySelector('[data-biaya-talent="t9"] [data-price-status]').dataset.priceStatus).toBe("tanpa-data");
+    isiKalkulator(dom);
+    doc.getElementById("calcSaveBtn").click();
+    const baris = doc.querySelector('[data-biaya-talent="t9"]');
+    expect(baris.querySelector("[data-price-status]").dataset.priceStatus).toBe("wajar");
+    expect(baris.textContent).toMatch(/analitik tersimpan/);
+    expect(doc.querySelector('[data-talent-id="t9"] [data-card-price] [data-price-status]').dataset.priceStatus).toBe("wajar");
+  });
+
+  it("memilih talent lagi mengisi kalkulator dari analitik terakhir; hapus minta konfirmasi", () => {
+    const dom = bukaHalaman([{ ...ACHMAD, analitik: [{ id: "an-1", at: "x", tanggal: "2026-10-12", biaya: 480000, views: 147539, konten: 8 }] }], []);
+    const doc = dom.window.document;
+    const sel = doc.getElementById("calcTalent");
+    sel.value = "t9";
+    sel.dispatchEvent(new dom.window.Event("change"));
+    expect(doc.getElementById("calcViews").value).toBe("147539");
+
+    dom.window.confirm = vi.fn(() => false);
+    doc.querySelector('[data-hapus-analitik="t9|an-1"]').click();
+    expect(simpanan(dom).talents[0].analitik).toHaveLength(1);
+    dom.window.confirm = vi.fn(() => true);
+    doc.querySelector('[data-hapus-analitik="t9|an-1"]').click();
+    expect(simpanan(dom).talents[0].analitik).toHaveLength(0);
+  });
+});

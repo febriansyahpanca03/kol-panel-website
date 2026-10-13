@@ -1532,6 +1532,7 @@
         .price-badge.muted { color: var(--txt-muted); background-color: var(--surface-2); }
         .price-note { margin-top: 4px; font-size: 12px; color: var(--txt-muted); white-space: normal; max-width: 420px; }
         .calc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: var(--spacing-lg); }
+        .calc-actions { margin-top: var(--spacing-lg); align-items: center; }
         .calc-hint { display: block; font-size: 11px; color: var(--txt-muted); margin-top: 2px; }
         .calc-verdict { margin-top: var(--spacing-md); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-sm); }
         @media (max-width: 768px) { .calc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -1811,7 +1812,17 @@
                     </div>
                 </div>
                 <div class="calc-results" id="calcResults" aria-live="polite"></div>
+                <div class="button-group calc-actions">
+                    <button type="button" class="button button-primary" id="calcSaveBtn">💾 Simpan analitik ke talent</button>
+                    <span class="text-muted" id="calcSaveMsg" aria-live="polite"></span>
+                </div>
             </div>
+
+            <div class="form-section-title biaya-matrix-head">
+                <span>Analitik tersimpan</span>
+                <button type="button" class="button button-secondary button-small" id="analitikExportBtn">⬇ Unduh CSV</button>
+            </div>
+            <div id="analitikList"></div>
         </div>
 
         <!-- TAB: AMBANG PERINGATAN -->
@@ -4301,7 +4312,8 @@
             return PantauCore.priceVerdict(talent, state.uploads, {
                 targetCpm: state.setelan.targetCpm,
                 overpricePercent: state.setelan.overpricePercent,
-                peerPrices
+                peerPrices,
+                snapshot: analitikTerakhir(talent)
             });
         }
 
@@ -4315,7 +4327,7 @@
             const bagian = [];
             if (v.hargaWajar !== null) {
                 bagian.push(`Harga ${formatCurrency(Math.round(v.harga))}/${unit}; wajar ±${formatCurrency(Math.round(v.hargaWajar))} ` +
-                    `(median ${new Intl.NumberFormat('id-ID').format(Math.round(v.medianViews))} views, CPM ${formatCurrency(state.setelan.targetCpm)}).`);
+                    `(${v.sumber === 'analitik' ? 'rata-rata' : 'median'} ${new Intl.NumberFormat('id-ID').format(Math.round(v.medianViews))} views, CPM ${formatCurrency(state.setelan.targetCpm)}).`);
                 if (v.rasio > 1 && isFinite(v.rasio)) bagian.push(`Lebih mahal ${Math.round((v.rasio - 1) * 100)}% dari harga wajar.`);
             }
             if (v.pembanding !== null && v.status !== 'tanpa-data' && !v.catatan.length && v.hargaWajar === null) {
@@ -4480,6 +4492,7 @@
             container.innerHTML = html;
             document.getElementById('biayaMatrixMode').addEventListener('change', renderBiayaTab);
             hitungKalkulator();
+            renderAnalitikList();
         }
 
         document.getElementById('biayaMonth').addEventListener('change', renderBiayaTab);
@@ -4577,7 +4590,100 @@
             set('calcViews', dgnViews.length ? jumlah(dgnViews, 'views') : null);
             set('calcInteraksi', own.some(u => PantauCore.numOrNull(u.interaksi) !== null) ? jumlah(dgnViews, 'interaksi') : null);
             set('calcKlik', own.some(u => PantauCore.numOrNull(u.klik) !== null) ? jumlah(dgnViews, 'klik') : null);
+            // Belum ada views per upload: pakai analitik terakhir yang disimpan.
+            const terakhir = analitikTerakhir(t);
+            if (!dgnViews.length && terakhir) {
+                ['biaya', 'views', 'klik', 'interaksi', 'konten'].forEach(k => {
+                    set('calc' + k[0].toUpperCase() + k.slice(1), PantauCore.numOrNull(terakhir[k]));
+                });
+            }
+            document.getElementById('calcSaveMsg').textContent = '';
             hitungKalkulator();
+        });
+
+        // ---- Analitik tersimpan -------------------------------------------
+        // Hasil kalkulator disimpan per talent (talent.analitik). Yang terbaru
+        // dipakai menilai harga bila belum ada views per upload.
+        function analitikTerakhir(talent) {
+            const list = talent.analitik || [];
+            return list.length ? list[list.length - 1] : null;
+        }
+
+        function bacaKalkulator() {
+            const val = id => PantauCore.numOrNull(document.getElementById(id).value);
+            const isi = { biaya: val('calcBiaya'), views: val('calcViews'), klik: val('calcKlik'),
+                interaksi: val('calcInteraksi'), konten: val('calcKonten') };
+            return Object.assign(isi, PantauCore.costMetrics(isi));
+        }
+
+        document.getElementById('calcSaveBtn').addEventListener('click', () => {
+            const pesan = document.getElementById('calcSaveMsg');
+            const talentId = document.getElementById('calcTalent').value;
+            const t = state.talents.find(x => x.id === talentId);
+            if (!t) { pesan.textContent = 'Pilih talent dulu di "Isi dari talent".'; return; }
+            const d = bacaKalkulator();
+            if (d.biaya === null || d.views === null) { pesan.textContent = 'Isi minimal biaya dan views.'; return; }
+
+            t.analitik = (t.analitik || []).concat([Object.assign({
+                id: 'an-' + Date.now(), at: new Date().toISOString(), tanggal: todayIso()
+            }, d)]);
+            saveData();
+            render();
+            document.getElementById('calcTalent').value = talentId;
+            document.getElementById('calcSaveMsg').textContent = 'Tersimpan untuk ' + t.name + '.';
+        });
+
+        function renderAnalitikList() {
+            const el = document.getElementById('analitikList');
+            const semua = [];
+            state.talents.forEach(t => (t.analitik || []).forEach(a => semua.push({ t, a })));
+            semua.sort((x, y) => String(y.a.at).localeCompare(String(x.a.at)));
+            if (!semua.length) {
+                el.innerHTML = '<p class="form-section-note">Belum ada. Hitung di kalkulator, pilih talentnya, lalu tekan Simpan.</p>';
+                return;
+            }
+            const pct = n => (n === null || n === undefined ? '&mdash;' : n.toFixed(2).replace('.', ',') + '%');
+            el.innerHTML = `
+                <div class="table-wrapper">
+                    <table class="biaya-table" id="analitikTable">
+                        <thead><tr><th class="left">Talent</th><th>Tanggal</th><th>Konten</th><th>Biaya</th><th>Views</th><th>Klik</th><th>Interaksi</th>
+                            <th>CPM</th><th>CPC</th><th>ER</th><th>CTR</th><th></th></tr></thead>
+                        <tbody>${semua.map(({ t, a }) => `
+                            <tr data-analitik="${a.id}">
+                                <td class="left">${escapeHtml(t.name)}</td><td>${formatDate(a.tanggal)}</td><td>${angka(a.konten)}</td>
+                                <td>${rupiahAtauKosong(a.biaya)}</td><td>${angka(a.views)}</td><td>${angka(a.klik)}</td><td>${angka(a.interaksi)}</td>
+                                <td>${rupiahAtauKosong(a.cpm)}</td><td>${rupiahAtauKosong(a.cpc)}</td><td>${pct(a.er)}</td><td>${pct(a.ctr)}</td>
+                                <td><button type="button" class="button button-small button-danger" data-hapus-analitik="${t.id}|${a.id}">Hapus</button></td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        document.getElementById('analitikList').addEventListener('click', e => {
+            const b = e.target.closest('[data-hapus-analitik]');
+            if (!b) return;
+            const [talentId, id] = b.dataset.hapusAnalitik.split('|');
+            const t = state.talents.find(x => x.id === talentId);
+            if (!t || !confirm('Hapus analitik ' + t.name + ' ini?')) return;
+            t.analitik = (t.analitik || []).filter(a => a.id !== id);
+            saveData();
+            render();
+        });
+
+        document.getElementById('analitikExportBtn').addEventListener('click', () => {
+            const kutip = v => '"' + String(v === null || v === undefined ? '' : v).replace(/"/g, '""') + '"';
+            const bulat = v => (v === null || v === undefined ? '' : Math.round(v * 100) / 100);
+            const baris = [['Talent', 'Akun', 'Tanggal', 'Konten', 'Biaya', 'Views', 'Klik', 'Interaksi', 'CPM', 'CPV', 'CPC', 'CPE', 'ER %', 'CTR %']];
+            state.talents.forEach(t => (t.analitik || []).forEach(a => baris.push([t.name, t.account, a.tanggal,
+                a.konten, a.biaya, a.views, a.klik, a.interaksi, bulat(a.cpm), bulat(a.cpv), bulat(a.cpc), bulat(a.cpe), bulat(a.er), bulat(a.ctr)])));
+            const blob = new Blob(['﻿' + baris.map(r => r.map(kutip).join(',')).join('\n')], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `analitik-talent-${todayIso()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         });
 
         // ---- Impor performa dari KOL Panel (sheet "Post" di KOL Manager) ----
