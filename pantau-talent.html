@@ -1537,6 +1537,26 @@
         .calc-verdict { margin-top: var(--spacing-md); font-size: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-sm); }
         @media (max-width: 768px) { .calc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
+        /* ---------------- Simpan online ---------------- */
+        .sync-pill {
+            display: inline-block; margin-top: var(--spacing-sm); padding: 3px 10px;
+            border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+            color: var(--txt-muted); background-color: var(--surface-2);
+        }
+        .sync-pill[data-state="ok"] { color: var(--ok); background-color: var(--ok-bg); }
+        .sync-pill[data-state="busy"] { color: var(--info); background-color: var(--info-bg); }
+        .sync-pill[data-state="error"] { color: var(--warn); background-color: var(--warn-bg); }
+
+        /* Mode lihat saja: semua kontrol yang mengubah data disembunyikan. */
+        .mode-lihat #addTalentBtn,
+        .mode-lihat [data-edit-talent], .mode-lihat [data-delete-talent],
+        .mode-lihat [data-quick-record], .mode-lihat [data-quick-record-from-card],
+        .mode-lihat [data-edit-upload], .mode-lihat [data-delete-upload],
+        .mode-lihat #calDetailConfirmBtn, .mode-lihat #calDetailUndoBtn,
+        .mode-lihat #importBtn, .mode-lihat #csvNotionBtn, .mode-lihat #syncNotionBtn, .mode-lihat #csvKolBtn,
+        .mode-lihat #cleanDuplicatesBtn, .mode-lihat #calcSaveBtn, .mode-lihat [data-hapus-analitik],
+        .mode-lihat [data-contract-pdf], .mode-lihat [data-letter-version] { display: none !important; }
+
         .talent-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .talent-card-platform.is-missing { color: var(--warn); background-color: var(--warn-bg); }
 
@@ -1662,6 +1682,7 @@
         <div class="header">
             <h1>Pantau Talent</h1>
             <p class="header-subtitle">Command center untuk kontrak, kuota, dan jadwal konten.</p>
+            <div class="sync-pill" id="syncPill" role="status" aria-live="polite" hidden></div>
             <svg class="pixel-astronaut" viewBox="0 0 16 20" shape-rendering="crispEdges"
                  role="img" aria-label="Maskot astronot piksel">
                 <!-- backpack -->
@@ -1827,6 +1848,30 @@
 
         <!-- TAB: AMBANG PERINGATAN -->
         <div id="settings" class="tab-content">
+            <div class="form-section-title" style="border-top: none; padding-top: 0;">Simpan Online</div>
+            <p class="form-section-note">Data tersimpan di server supaya bisa dibuka dari perangkat mana pun. Hanya pemegang <strong>frasa sandi edit</strong> yang bisa mengubah. Frasa sandi lihat (opsional) untuk tim: hanya membaca, dan No. HP, alamat, serta rekening talent disembunyikan.</p>
+            <div class="card" id="onlinePanel">
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Peran perangkat ini</div>
+                        <select id="onlineMode">
+                            <option value="">Tidak tersambung (hanya browser ini)</option>
+                            <option value="owner">Pemilik — bisa mengedit</option>
+                            <option value="viewer">Lihat saja</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <div class="field-label">Frasa sandi</div>
+                        <input type="password" id="onlineKey" autocomplete="current-password" placeholder="sesuai env var di Vercel">
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="button button-primary" id="onlineConnectBtn">Hubungkan</button>
+                    <button type="button" class="button button-secondary" id="onlineDisconnectBtn" hidden>Putuskan perangkat ini</button>
+                </div>
+                <div class="setting-description" id="onlineStatus" aria-live="polite"></div>
+            </div>
+
             <div class="card">
                 <div class="card-row">
                     <div class="setting-item">
@@ -2248,7 +2293,16 @@
 
         // Save data
         function saveData() {
+            if (typeof modeLihat === 'function' && modeLihat()) {
+                statusOnline('Mode lihat saja — perubahan tidak disimpan', 'error');
+                return;
+            }
             localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            if (typeof online !== 'undefined' && online.mode === 'owner') {
+                online.dirty = true;
+                simpanOnline();
+                jadwalkanKirim();
+            }
         }
 
         const NUMBER_SETTINGS = ['lowQuotaVideos', 'lowQuotaPercent', 'contractEndingSoon', 'behindThreshold', 'dpPercent', 'targetCpm', 'overpricePercent'];
@@ -4720,6 +4774,189 @@
         });
 
         // ============================================================================
+        // SIMPAN ONLINE
+        // ============================================================================
+        //
+        // Pemilik (sandi edit): setiap simpan ditulis ke browser lalu dikirim ke
+        // server. Pembaca (sandi lihat): data diambil dari server, hanya
+        // dibaca, data pribadi talent sudah dihapus server, dan tidak pernah
+        // ditulis ke penyimpanan browser ini.
+
+        const ONLINE_KEY = 'pantau-talent-online';
+        var online = bacaOnline();
+        let pushTimer = null;
+        let pushJalan = false;
+
+        function bacaOnline() {
+            try { return Object.assign({ mode: '', key: '', version: 0, dirty: false, updatedAt: null }, JSON.parse(localStorage.getItem(ONLINE_KEY) || '{}')); }
+            catch (e) { return { mode: '', key: '', version: 0, dirty: false, updatedAt: null }; }
+        }
+
+        function simpanOnline() {
+            localStorage.setItem(ONLINE_KEY, JSON.stringify(online));
+        }
+
+        function modeLihat() {
+            return !!online && online.mode === 'viewer';
+        }
+
+        function headerOnline() {
+            return online.mode === 'owner' ? { 'x-edit-key': online.key } : { 'x-view-key': online.key };
+        }
+
+        function statusOnline(teks, jenis) {
+            const pill = document.getElementById('syncPill');
+            pill.hidden = !online.mode;
+            pill.textContent = teks;
+            pill.dataset.state = jenis || '';
+            const el = document.getElementById('onlineStatus');
+            if (el) el.textContent = teks + (online.updatedAt ? ' · versi ' + online.version + ', ' + formatWaktu(online.updatedAt) : '');
+        }
+
+        function terapkanModeLihat() {
+            document.body.classList.toggle('mode-lihat', modeLihat());
+            document.querySelectorAll('#settings input, #settings textarea').forEach(el => {
+                if (!el.closest('#onlinePanel')) el.disabled = modeLihat();
+            });
+        }
+
+        function unduhCadanganLokal(alasan) {
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `pantau-talent-${alasan}-${todayIso()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function pakaiDataOnline(res) {
+            const data = res.data || { talents: [], uploads: [], setelan: {} };
+            data.talents = data.talents || [];
+            data.uploads = data.uploads || [];
+            data.setelan = Object.assign({}, DEFAULT_SETTINGS, data.setelan || {});
+            state = data;
+            online.version = res.version;
+            online.updatedAt = res.updatedAt;
+            online.dirty = false;
+            simpanOnline();
+            if (!modeLihat()) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            render();
+        }
+
+        async function kirimOnline(force) {
+            if (online.mode !== 'owner' || pushJalan) return;
+            pushJalan = true;
+            statusOnline('Menyimpan online…', 'busy');
+            try {
+                const r = await fetch('api/data', {
+                    method: 'PUT',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, headerOnline()),
+                    body: JSON.stringify({ data: state, baseVersion: online.version, force: !!force })
+                });
+                const res = await r.json().catch(() => ({}));
+                if (r.status === 409) { pushJalan = false; return tanganiKonflik(res); }
+                if (!r.ok) throw new Error(res.error || ('HTTP ' + r.status));
+                online.version = res.version;
+                online.updatedAt = res.updatedAt;
+                online.dirty = false;
+                simpanOnline();
+                statusOnline('Tersimpan online ✓', 'ok');
+            } catch (e) {
+                statusOnline('Belum tersimpan online — ' + (e.message || e) + '. Tersimpan di browser ini.', 'error');
+            } finally {
+                pushJalan = false;
+            }
+        }
+
+        function jadwalkanKirim() {
+            window.clearTimeout(pushTimer);
+            pushTimer = window.setTimeout(() => kirimOnline(false), 1200);
+        }
+
+        async function tanganiKonflik(info) {
+            const kapan = info && info.updatedAt ? formatWaktu(info.updatedAt) : 'baru saja';
+            const pakaiOnline = confirm(
+                'Data online sudah diubah dari perangkat lain (' + kapan + ').\n\n' +
+                'OK = pakai data online. Perubahan di perangkat ini diunduh dulu sebagai berkas cadangan.\n' +
+                'Batal = timpa data online dengan isi perangkat ini.');
+            if (pakaiOnline) {
+                unduhCadanganLokal('sebelum-sinkron');
+                await tarikOnline(true);
+            } else {
+                await kirimOnline(true);
+            }
+        }
+
+        // Dipanggil saat halaman dibuka dan saat menghubungkan perangkat.
+        async function tarikOnline(paksaPakaiOnline) {
+            if (!online.mode || !online.key) return;
+            statusOnline('Memuat data online…', 'busy');
+            try {
+                const r = await fetch('api/data', { headers: headerOnline() });
+                const res = await r.json().catch(() => ({}));
+                if (r.status === 401) throw new Error('frasa sandi salah');
+                if (!r.ok) throw new Error((res.error || ('HTTP ' + r.status)) + (res.detail ? ' (' + res.detail + ')' : ''));
+
+                if (res.role !== online.mode) { online.mode = res.role; simpanOnline(); }
+                terapkanModeLihat();
+
+                if (modeLihat() || paksaPakaiOnline) {
+                    pakaiDataOnline(res);
+                    statusOnline(modeLihat() ? 'Mode lihat saja · data online' : 'Tersimpan online ✓', 'ok');
+                    return;
+                }
+                if (!res.data) {
+                    // Server masih kosong: isi browser ini jadi data online pertama.
+                    online.version = 0;
+                    await kirimOnline(true);
+                    return;
+                }
+                if (!online.dirty && res.version >= online.version) {
+                    pakaiDataOnline(res);
+                    statusOnline('Tersimpan online ✓', 'ok');
+                } else if (online.dirty && res.version === online.version) {
+                    await kirimOnline(false);
+                } else {
+                    await tanganiKonflik(res);
+                }
+            } catch (e) {
+                statusOnline('Tidak tersambung — ' + (e.message || e) + '. Memakai data di browser ini.', 'error');
+            }
+        }
+
+        function renderOnlinePanel() {
+            document.getElementById('onlineMode').value = online.mode || '';
+            document.getElementById('onlineConnectBtn').hidden = false;
+            document.getElementById('onlineDisconnectBtn').hidden = !online.mode;
+        }
+
+        document.getElementById('onlineConnectBtn').addEventListener('click', async () => {
+            const mode = document.getElementById('onlineMode').value;
+            const key = document.getElementById('onlineKey').value.trim();
+            if (!mode || !key) { statusOnline('Pilih peran dan isi frasa sandinya.', 'error'); document.getElementById('syncPill').hidden = false; return; }
+            online = { mode, key, version: 0, dirty: mode === 'owner' && state.talents.length > 0, updatedAt: null };
+            simpanOnline();
+            document.getElementById('onlineKey').value = '';
+            renderOnlinePanel();
+            await tarikOnline(false);
+            renderOnlinePanel();
+        });
+
+        document.getElementById('onlineDisconnectBtn').addEventListener('click', () => {
+            if (!confirm('Putuskan perangkat ini dari data online? Frasa sandi dihapus dari browser ini.')) return;
+            const dariLihat = modeLihat();
+            online = { mode: '', key: '', version: 0, dirty: false, updatedAt: null };
+            simpanOnline();
+            document.body.classList.remove('mode-lihat');
+            terapkanModeLihat();
+            statusOnline('', '');
+            renderOnlinePanel();
+            // Data mode lihat tidak pernah disimpan; kembali ke isi browser ini.
+            if (dariLihat) { state = initializeData(); render(); }
+        });
+
+        // ============================================================================
         // RENDER FUNCTION
         // ============================================================================
 
@@ -4738,6 +4975,9 @@
 
         let state = initializeData();
         render();
+        renderOnlinePanel();
+        terapkanModeLihat();
+        tarikOnline(false);
     </script>
 
     <!--

@@ -12,7 +12,7 @@
 
 const NOTION_VERSION = '2022-06-28';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
     const token = process.env.NOTION_TOKEN;
     const sandi = process.env.SYNC_PASSPHRASE;
     const dbId = process.env.NOTION_DATABASE_ID;
