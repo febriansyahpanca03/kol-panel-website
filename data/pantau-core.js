@@ -317,7 +317,8 @@
 
             rows.forEach(r => {
                 if (String(r.nama || '').trim().toLowerCase() !== kunci) return;
-                if (r.tgl < t.startDate || r.tgl > t.endDate || r.tgl > today) { diLuarPeriode++; return; }
+                const dalamKontrak = contractsOf(t).some(c => r.tgl >= c.startDate && r.tgl <= c.endDate);
+                if (!dalamKontrak || r.tgl > today) { diLuarPeriode++; return; }
 
                 const nid = r.notionId || '';
                 if (nid) {
@@ -530,6 +531,92 @@
     }
 
     // ------------------------------------------------------------------------
+    // Kontrak berurutan (perpanjangan)
+    // ------------------------------------------------------------------------
+    //
+    // Kontrak yang sedang berjalan tetap disimpan di kolom talent itu sendiri
+    // (agar semua tampilan lama tetap bekerja); kontrak sebelumnya diarsipkan
+    // di talent.kontrakLama. Data lama tanpa arsip = Kontrak #1.
+
+    const KOLOM_KONTRAK = ['quota', 'value', 'startDate', 'endDate', 'uploadDays', 'uploadDates', 'contentType',
+        'platforms', 'platform', 'dpPercent', 'scheduleText', 'contractDate', 'letters', 'letterStale',
+        'pinnedSlots', 'pinnedFrom'];
+
+    function contractsOf(talent) {
+        const lama = (talent.kontrakLama || []).map((c, i) => Object.assign({ no: c.no || i + 1, arsip: true }, c));
+        const kini = { no: talent.kontrakNo || lama.length + 1, arsip: false };
+        KOLOM_KONTRAK.forEach(k => { if (k in talent) kini[k] = talent[k]; });
+        return lama.concat([kini]).sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)) || a.no - b.no);
+    }
+
+    /**
+     * Kontrak untuk satu tanggal upload: yang periodenya mencakup tanggal itu
+     * (bila tumpang tindih, yang mulai paling akhir). Sebelum kontrak pertama
+     * → kontrak pertama; sesudah kontrak terakhir → kontrak terakhir (upload
+     * telat tetap milik kontrak berjalan). Di sela dua kontrak → null.
+     */
+    function contractForDate(kontrak, date) {
+        if (!kontrak.length) return null;
+        const cakup = kontrak.filter(c => date >= c.startDate && date <= c.endDate);
+        if (cakup.length) return cakup[cakup.length - 1];
+        if (date < kontrak[0].startDate) return kontrak[0];
+        const akhir = kontrak[kontrak.length - 1];
+        if (date > akhir.endDate) return akhir;
+        return null;
+    }
+
+    function uploadsForContract(talent, uploads, no) {
+        const kontrak = contractsOf(talent);
+        return uploads.filter(u => {
+            if (u.talentId !== talent.id || !u.date) return false;
+            const c = contractForDate(kontrak, u.date);
+            return c && c.no === no;
+        });
+    }
+
+    function currentUploads(talent, uploads) {
+        const kontrak = contractsOf(talent);
+        return uploadsForContract(talent, uploads, kontrak.find(c => !c.arsip).no);
+    }
+
+    function outsideContractUploads(talent, uploads) {
+        const kontrak = contractsOf(talent);
+        return uploads.filter(u => u.talentId === talent.id && u.date && !contractForDate(kontrak, u.date));
+    }
+
+    /**
+     * Perpanjang: kontrak berjalan diarsipkan utuh (termasuk suratnya), lalu
+     * kolom kontrak diisi kontrak baru. Identitas talent, riwayat upload, dan
+     * analitik tetap satu. Surat dan paku jadwal kontrak baru mulai kosong.
+     */
+    function renewContract(talent, fields, nowIso) {
+        const kontrak = contractsOf(talent);
+        const kini = kontrak.find(c => !c.arsip);
+        if (!fields.startDate || !fields.endDate || fields.endDate < fields.startDate) {
+            return { error: 'Periode kontrak baru tidak valid.' };
+        }
+        if (fields.startDate <= kini.startDate) {
+            return { error: 'Kontrak baru harus mulai setelah ' + kini.startDate + ' (awal kontrak #' + kini.no + ').' };
+        }
+        const arsip = { no: kini.no, arsipAt: nowIso };
+        KOLOM_KONTRAK.forEach(k => { if (k in talent) arsip[k] = talent[k]; });
+
+        const baru = Object.assign({}, talent, fields);
+        baru.kontrakLama = (talent.kontrakLama || []).concat([arsip]);
+        baru.kontrakNo = kini.no + 1;
+        baru.letters = [];
+        baru.letterStale = false;
+        delete baru.pinnedSlots;
+        delete baru.pinnedFrom;
+        const ringkas = c => '#' + c.no + ' ' + c.startDate + ' s/d ' + c.endDate + ', ' + c.quota + ' konten, Rp' + (Number(c.value) || 0);
+        baru.changeLog = (talent.changeLog || []).concat([{
+            at: nowIso, field: 'kontrak', label: 'Perpanjang kontrak',
+            from: ringkas(kini), to: ringkas(Object.assign({ no: kini.no + 1 }, baru))
+        }]);
+        return { talent: baru };
+    }
+
+    // ------------------------------------------------------------------------
     // Biaya & performa
     // ------------------------------------------------------------------------
 
@@ -573,17 +660,25 @@
     function monthlyLedger(talents, uploads) {
         const out = {};
         talents.forEach(t => {
-            const harga = pricePerContent(t) || 0;
-            const q = parseInt(t.quota, 10) || 0;
             const own = uploads.filter(u => u.talentId === t.id && u.date).slice().sort(byDateThenId);
             out[t.id] = {};
-            own.forEach((u, i) => {
+            // Tiap kontrak punya harga dan kuotanya sendiri, sehingga biaya
+            // bulan lama tidak berubah saat kontrak diperpanjang.
+            const kontrak = contractsOf(t);
+            const terpakai = {};
+            own.forEach(u => {
                 const m = monthOf(u.date);
                 const a = out[t.id][m] || (out[t.id][m] = {
                     konten: 0, bonus: 0, biaya: 0, views: 0, interaksi: 0, klik: 0,
-                    denganViews: 0, denganInteraksi: 0, denganKlik: 0
+                    denganViews: 0, denganInteraksi: 0, denganKlik: 0, luarKontrak: 0
                 });
-                if (i < q) { a.konten++; a.biaya += harga; } else a.bonus++;
+                const c = contractForDate(kontrak, u.date);
+                if (!c) { a.bonus++; a.luarKontrak++; }
+                else {
+                    terpakai[c.no] = (terpakai[c.no] || 0) + 1;
+                    if (terpakai[c.no] <= (parseInt(c.quota, 10) || 0)) { a.konten++; a.biaya += pricePerContent(c) || 0; }
+                    else a.bonus++;
+                }
                 const v = numOrNull(u.views), it = numOrNull(u.interaksi), k = numOrNull(u.klik);
                 if (v !== null) { a.views += v; a.denganViews++; }
                 if (it !== null) { a.interaksi += it; a.denganInteraksi++; }
@@ -782,6 +877,7 @@
     }
 
     root.PantauCore = {
+        contractsOf, contractForDate, uploadsForContract, currentUploads, outsideContractUploads, renewContract,
         numOrNull, median, monthOf, pricePerContent, monthlyLedger, paymentSchedule, costMetrics, priceVerdict,
         parseTanggalSheet, rowsFromKolCsv, planKolImport, applyKolImport,
         parseIso, addDays, daysBetween, uploadDaysOf, buildSchedule, talentMetrics,

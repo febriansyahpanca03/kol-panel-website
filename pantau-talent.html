@@ -1555,7 +1555,8 @@
         .mode-lihat #calDetailConfirmBtn, .mode-lihat #calDetailUndoBtn,
         .mode-lihat #importBtn, .mode-lihat #csvNotionBtn, .mode-lihat #syncNotionBtn, .mode-lihat #csvKolBtn,
         .mode-lihat #cleanDuplicatesBtn, .mode-lihat #calcSaveBtn, .mode-lihat [data-hapus-analitik],
-        .mode-lihat [data-contract-pdf], .mode-lihat [data-letter-version] { display: none !important; }
+        .mode-lihat [data-contract-pdf], .mode-lihat [data-letter-version],
+        .mode-lihat [data-renew-talent], .mode-lihat [data-arsip-letter] { display: none !important; }
 
         .talent-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .talent-card-platform.is-missing { color: var(--warn); background-color: var(--warn-bg); }
@@ -2385,7 +2386,7 @@
         // status slot kalender) datang dari satu fungsi di data/pantau-core.js
         // agar kartu, tab Hari Ini, dan kalender tidak bisa saling membantah.
         function metricsFor(talent) {
-            return PantauCore.talentMetrics(talent, state.uploads, todayIso());
+            return PantauCore.talentMetrics(talent, PantauCore.currentUploads(talent, state.uploads), todayIso());
         }
 
         function metricsById(talentId) {
@@ -2727,7 +2728,7 @@
                     (m.unscheduled ? ` &middot; <span class="quota-over">${m.unscheduled} kuota tidak muat di jadwal</span>` : '') +
                     `</div>`;
 
-                const uploads_sorted = [...(state.uploads.filter(u => u.talentId === talent.id) || [])]
+                const uploads_sorted = [...PantauCore.currentUploads(talent, state.uploads)]
                     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
                 const uploadHistoryHtml = uploads_sorted.length > 0
@@ -2757,6 +2758,7 @@
                                         ? '<span class="talent-card-platform is-missing" data-platform-missing>platform belum diisi</span>'
                                         : PantauCore.platformsOf(talent).map(p => `<span class="talent-card-platform">${escapeHtml(p)}</span>`).join('')}
                                     <span class="talent-card-platform">${PantauCore.contentTypeOf(talent).label}</span>
+                                    ${(talent.kontrakLama || []).length ? `<span class="talent-card-platform" data-kontrak-no>Kontrak #${PantauCore.contractsOf(talent).find(c => !c.arsip).no}</span>` : ''}
                                 </div>
                             </div>
                             <div class="talent-card-quota${m.over ? ' is-over' : ''}">
@@ -2808,11 +2810,13 @@
                             </div>
 
                             ${renderLetterSection(talent)}
+                            ${renderRiwayatKontrak(talent)}
                             ${renderChangeLog(talent)}
 
                             <div class="talent-card-actions">
                                 <button class="button button-primary" data-edit-talent="${talent.id}">✎ Edit Kontrak</button>
                                 <button class="button button-primary" data-quick-record-from-card="${talent.id}">+ Catat Upload</button>
+                                <button class="button button-secondary" data-renew-talent="${talent.id}">🔁 Perpanjang Kontrak</button>
                                 <button class="button button-secondary" data-contract-pdf="${talent.id}">📄 ${letterButtonLabel(talent)}</button>
                                 <button class="button button-danger" data-delete-talent="${talent.id}">🗑 Hapus</button>
                             </div>
@@ -2877,6 +2881,74 @@
             if (hari.length) return hari.map(d => getDayName(d)).join(', ');
             return '<span class="text-muted">belum diisi &middot; jadwal disebar rata</span>';
         }
+
+        // ---- Perpanjangan kontrak ------------------------------------------
+        function nilaiSemuaKontrak(t) {
+            return PantauCore.contractsOf(t).reduce((s, c) => s + (Number(c.value) || 0), 0);
+        }
+
+        // Formulir yang sama, diisi dari kontrak berjalan; periode baru
+        // dimulai sehari setelah kontrak lama berakhir dengan durasi yang sama.
+        function siapkanPerpanjang(talent) {
+            const form = document.getElementById('talentForm');
+            const no = PantauCore.contractsOf(talent).find(c => !c.arsip).no;
+            form.dataset.renew = '1';
+            document.getElementById('talentModalTitle').textContent =
+                'Perpanjang Kontrak — ' + talent.name + ' (kontrak #' + (no + 1) + ')';
+            const durasi = PantauCore.daysBetween(talent.startDate, talent.endDate);
+            const mulai = PantauCore.addDays(talent.endDate, 1);
+            document.getElementById('talentStartDate').value = mulai;
+            document.getElementById('talentEndDate').value = PantauCore.addDays(mulai, Math.max(0, durasi));
+            document.getElementById('talentContractDate').value = '';
+            // Tanggal pilihan milik periode lama; kontrak baru mulai dari hari tetap/sebar rata.
+            if (document.getElementById('talentForm').dataset.schedMode === 'tanggal') {
+                document.getElementById('talentUploadDates').value = '';
+                aturModeJadwal(PantauCore.uploadDaysOf(talent).length ? 'hari' : 'rata');
+            }
+            segarkanPilihanJadwal();
+        }
+
+        function renderRiwayatKontrak(talent) {
+            const lama = PantauCore.contractsOf(talent).filter(c => c.arsip);
+            const luar = PantauCore.outsideContractUploads(talent, state.uploads);
+            if (!lama.length && !luar.length) return '';
+            const baris = lama.slice().reverse().map(c => {
+                const tayang = PantauCore.uploadsForContract(talent, state.uploads, c.no).length;
+                const unit = PantauCore.contentTypeOf(c).unit;
+                const surat = (c.letters || []).map(l =>
+                    `<button type="button" class="button button-small button-secondary" data-arsip-letter="${talent.id}|${c.no}|${l.version}">Surat v${l.version}</button>`).join(' ');
+                return `
+                    <div class="upload-item" data-kontrak-arsip="${c.no}">
+                        <div class="upload-item-info">
+                            <div class="upload-item-date">Kontrak #${c.no} &middot; ${formatDate(c.startDate)} &ndash; ${formatDate(c.endDate)}</div>
+                            <div class="upload-item-title">${tayang} dari ${c.quota} ${unit} tayang &middot; ${formatCurrency(Number(c.value) || 0)}</div>
+                        </div>
+                        <div class="upload-item-actions">${surat}</div>
+                    </div>`;
+            }).join('');
+            const catatanLuar = luar.length
+                ? `<div class="letter-stale" data-luar-kontrak>${luar.length} upload jatuh di sela dua kontrak (${luar.map(u => formatDate(u.date)).join(', ')}) sehingga tidak dihitung ke kuota mana pun. Ubah tanggalnya atau periode kontrak bila seharusnya masuk.</div>`
+                : '';
+            return `
+                <div class="upload-history">
+                    <div class="upload-history-title">Riwayat Kontrak</div>
+                    ${catatanLuar}
+                    <div class="upload-list">${baris}</div>
+                </div>`;
+        }
+
+        document.addEventListener('click', e => {
+            const renew = e.target.closest('[data-renew-talent]');
+            if (renew) { openTalentModal(renew.dataset.renewTalent, true); return; }
+            const arsip = e.target.closest('[data-arsip-letter]');
+            if (arsip) {
+                const [talentId, no, version] = arsip.dataset.arsipLetter.split('|');
+                const t = state.talents.find(x => x.id === talentId);
+                const c = t && PantauCore.contractsOf(t).find(k => String(k.no) === no);
+                const l = c && (c.letters || []).find(x => String(x.version) === version);
+                if (l && pdfSiap()) cetakSurat(l);
+            }
+        });
 
         function letterButtonLabel(talent) {
             const letters = talent.letters || [];
@@ -3048,12 +3120,13 @@
         // MODALS
         // ============================================================================
 
-        function openTalentModal(talentId = null) {
+        function openTalentModal(talentId = null, perpanjang = false) {
             const modal = document.getElementById('talentModal');
             const form = document.getElementById('talentForm');
             const title = document.getElementById('talentModalTitle');
 
             form.reset();
+            delete form.dataset.renew;
 
             if (talentId) {
                 const talent = state.talents.find(t => t.id === talentId);
@@ -3076,6 +3149,7 @@
                     document.getElementById('talentNotionName').value = talent.notionName || '';
                     form.dataset.talentId = talentId;
                     isiPilihanKontrak(talent);
+                    if (perpanjang) siapkanPerpanjang(talent);
                 }
             } else {
                 title.textContent = 'Tambah Talent';
@@ -3126,6 +3200,17 @@
                 notionName: document.getElementById('talentNotionName').value.trim()
             };
 
+            if (talentId && document.getElementById('talentForm').dataset.renew) {
+                const lamaT = state.talents.find(t => t.id === talentId);
+                const hasil = PantauCore.renewContract(lamaT, talentData, new Date().toISOString());
+                if (hasil.error) { alert(hasil.error); return; }
+                state.talents[state.talents.findIndex(t => t.id === talentId)] = hasil.talent;
+                saveData();
+                render();
+                closeTalentModal();
+                return;
+            }
+
             if (!talentId) {
                 state.talents.push(Object.assign({ id: 'talent-' + Date.now() }, talentData));
                 saveData();
@@ -3137,7 +3222,7 @@
             // Edit: field lain milik talent (riwayat perubahan, surat, paku
             // jadwal) dipertahankan; perubahan jadwal ditunjukkan dulu.
             const lama = state.talents.find(t => t.id === talentId);
-            const rencana = PantauCore.planContractEdit(lama, talentData, state.uploads, todayIso(), new Date().toISOString());
+            const rencana = PantauCore.planContractEdit(lama, talentData, PantauCore.currentUploads(lama, state.uploads), todayIso(), new Date().toISOString());
             if (!rencana.changes.length) { closeTalentModal(); return; }
             if (rencana.scheduleChanged) { bukaDampakJadwal(rencana); return; }
             terapkanEditKontrak(rencana);
@@ -4394,7 +4479,7 @@
         // dipusatkan di sekitar bulan berjalan).
         function daftarBulanBiaya() {
             const set = new Set([PantauCore.monthOf(todayIso())]);
-            state.talents.forEach(t => {
+            state.talents.forEach(talent => PantauCore.contractsOf(talent).forEach(t => {
                 if (t.startDate && t.endDate) {
                     for (let m = PantauCore.monthOf(t.startDate); m <= PantauCore.monthOf(t.endDate); ) {
                         set.add(m);
@@ -4402,7 +4487,7 @@
                         m = mm === 12 ? (y + 1) + '-01' : y + '-' + String(mm + 1).padStart(2, '0');
                     }
                 }
-            });
+            }));
             state.uploads.forEach(u => u.date && set.add(PantauCore.monthOf(u.date)));
             const semua = [...set].sort();
             const kini = semua.indexOf(PantauCore.monthOf(todayIso()));
@@ -4415,9 +4500,9 @@
             const bayar = {};
             state.talents.forEach(t => {
                 bayar[t.id] = {};
-                PantauCore.paymentSchedule(t, effectiveDp(t)).forEach(p => {
+                PantauCore.contractsOf(t).forEach(c => PantauCore.paymentSchedule(c, effectiveDp(c)).forEach(p => {
                     (bayar[t.id][p.month] = bayar[t.id][p.month] || []).push(p);
-                });
+                }));
             });
             return { ledger, bayar };
         }
@@ -4535,10 +4620,10 @@
                         <tbody>
                             ${state.talents.map(t => {
                                 const sel2 = bulan.map(m => sel(m, t));
-                                return `<tr><td class="left">${escapeHtml(t.name)}</td>${sel2.map((x, i) => `<td${bulan[i] === terpilih ? ' class="is-current"' : ''}>${x ? formatCurrency(Math.round(x)) : '<span class="text-muted">&middot;</span>'}</td>`).join('')}<td><strong>${formatCurrency(Math.round(sel2.reduce((s, x) => s + x, 0)))}</strong></td><td>${formatCurrency(Number(t.value) || 0)}</td></tr>`;
+                                return `<tr><td class="left">${escapeHtml(t.name)}</td>${sel2.map((x, i) => `<td${bulan[i] === terpilih ? ' class="is-current"' : ''}>${x ? formatCurrency(Math.round(x)) : '<span class="text-muted">&middot;</span>'}</td>`).join('')}<td><strong>${formatCurrency(Math.round(sel2.reduce((s, x) => s + x, 0)))}</strong></td><td>${formatCurrency(nilaiSemuaKontrak(t))}</td></tr>`;
                             }).join('')}
                         </tbody>
-                        <tfoot><tr><th class="left">Total</th>${totalKolom.map((x, i) => `<th${bulan[i] === terpilih ? ' class="is-current"' : ''}>${formatCurrency(Math.round(x))}</th>`).join('')}<th>${formatCurrency(Math.round(totalKolom.reduce((s, x) => s + x, 0)))}</th><th>${formatCurrency(state.talents.reduce((s, t) => s + (Number(t.value) || 0), 0))}</th></tr></tfoot>
+                        <tfoot><tr><th class="left">Total</th>${totalKolom.map((x, i) => `<th${bulan[i] === terpilih ? ' class="is-current"' : ''}>${formatCurrency(Math.round(x))}</th>`).join('')}<th>${formatCurrency(Math.round(totalKolom.reduce((s, x) => s + x, 0)))}</th><th>${formatCurrency(state.talents.reduce((s, t) => s + nilaiSemuaKontrak(t), 0))}</th></tr></tfoot>
                     </table>
                 </div>
                 <p class="form-section-note">Biaya konten = harga per konten &times; konten yang tayang bulan itu (konten di atas kuota dihitung bonus, Rp0). Jadwal bayar mengikuti surat kontrak: DP di bulan mulai, pelunasan di bulan berakhir.</p>`;
