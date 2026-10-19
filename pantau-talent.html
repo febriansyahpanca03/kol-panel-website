@@ -1587,6 +1587,15 @@
             background-color: var(--surface); color: var(--txt); box-shadow: 0 8px 24px rgba(0,0,0,.4); font-size: 14px;
         }
 
+        /* ---------------- Layak lanjut, pembayaran, ringkasan ---------------- */
+        .today-actions { display: flex; justify-content: flex-end; margin-bottom: var(--spacing-md); }
+        .pay-sum { font-family: 'Inter', sans-serif; font-size: 12px; letter-spacing: 0; text-transform: none; }
+        .pay-late { color: var(--danger); }
+        .summary-card.is-over-budget { border-left-color: var(--danger); }
+        .summary-card.is-over-budget .summary-value { color: var(--danger); }
+        .ringkasan-text { width: 100%; font-family: var(--font-mono); font-size: 13px; line-height: 1.5; margin-bottom: var(--spacing-md); }
+        .mode-lihat [data-bayar], .mode-lihat #csvSalesBtn { display: none !important; }
+
         /* ---------------- Edit jadwal ---------------- */
         .jadwal-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-bottom: var(--spacing-md); }
         .jadwal-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: var(--spacing-md); padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
@@ -2096,6 +2105,7 @@
                 <label class="field-label" for="biayaMonth">Bulan</label>
                 <select class="talent-filter" id="biayaMonth"></select>
                 <button type="button" class="button button-secondary button-small" id="biayaExportBtn">⬇ Unduh rekap CSV</button>
+                <button type="button" class="button button-secondary button-small" id="csvSalesBtn" title="Laporan affiliate/kreator dari TikTok Shop Seller Center">🛒 Impor Penjualan TikTok Shop (CSV)</button>
             </div>
             <div id="biayaContainer"></div>
 
@@ -2131,6 +2141,13 @@
                         <div class="field-label">Jumlah konten</div>
                         <input type="text" inputmode="numeric" id="calcKonten" placeholder="untuk harga wajar per konten">
                     </div>
+                </div>
+                <div class="card-row">
+                    <div class="field">
+                        <div class="field-label">Penjualan / GMV (Rp)</div>
+                        <input type="text" inputmode="numeric" id="calcGmv" placeholder="opsional, untuk ROAS">
+                    </div>
+                    <div class="field"></div>
                 </div>
                 <div class="calc-results" id="calcResults" aria-live="polite"></div>
                 <div class="button-group calc-actions">
@@ -2214,6 +2231,20 @@
                             <div class="field-label">Target CPM (Rp per 1.000 views)</div>
                             <input type="number" id="targetCpm" min="1" value="100000">
                             <div class="setting-description">Biaya maksimal yang Anda anggap wajar untuk setiap 1.000 views</div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="field">
+                            <div class="field-label">Toleransi telat upload (hari)</div>
+                            <input type="number" id="toleransiTelat" min="0" max="14" value="1">
+                            <div class="setting-description">Upload sampai N hari setelah jadwal masih dihitung tepat waktu di skor Layak Lanjut</div>
+                        </div>
+                    </div>
+                    <div class="setting-item">
+                        <div class="field">
+                            <div class="field-label">Anggaran KOL per bulan (Rp)</div>
+                            <input type="number" id="budgetBulanan" min="0" value="0">
+                            <div class="setting-description">0 = tidak dipakai. Diisi → peringatan bila jadwal bayar sebulan melewatinya</div>
                         </div>
                     </div>
                     <div class="setting-item">
@@ -2365,6 +2396,12 @@
                     <input type="hidden" id="talentUploadDates" value="">
                 </div>
 
+                <div class="field form-block">
+                    <div class="field-label">Sudah tayang sebelum didata (jumlah)</div>
+                    <input type="number" id="talentUploadAwal" min="0" placeholder="0">
+                    <div class="setting-description">Untuk kontrak yang sudah berjalan: isi jumlah konten yang sudah tayang. Jadwal terlewat paling awal otomatis terisi; entrinya bisa diedit di Riwayat Upload.</div>
+                </div>
+
                 <div class="form-section-title">Data untuk Surat Kontrak</div>
                 <p class="form-section-note">Dipakai saat membuat PDF surat kontrak. Boleh dikosongkan dulu — bagian yang kosong akan ditandai <code>[…]</code> di surat.</p>
 
@@ -2439,6 +2476,23 @@
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <!-- MODAL: Ringkasan harian untuk WhatsApp / Telegram -->
+    <div id="ringkasanModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Tutup">&times;</button>
+            <div class="modal-title">Ringkasan Hari Ini</div>
+            <p class="form-section-note">Teks bisa diubah dulu sebelum dikirim. WhatsApp membuka pesan siap kirim; Telegram terkirim langsung lewat bot Anda (perlu setelan di Vercel).</p>
+            <textarea id="ringkasanText" rows="14" class="ringkasan-text"></textarea>
+            <div class="button-group">
+                <button type="button" class="button button-primary" id="ringkasanWaBtn">WhatsApp</button>
+                <button type="button" class="button button-primary" id="ringkasanTgBtn">Telegram</button>
+                <button type="button" class="button button-secondary" id="ringkasanCopyBtn">Salin</button>
+                <button type="button" class="button button-secondary" id="ringkasanCloseBtn">Tutup</button>
+            </div>
+            <div class="setting-description" id="ringkasanMsg" aria-live="polite"></div>
+        </div>
+    </div>
 
     <!-- MODAL: Edit jadwal per slot -->
     <div id="jadwalModal" class="modal">
@@ -2550,6 +2604,7 @@
     <input type="file" id="importFile" accept=".json" style="display: none;">
     <input type="file" id="csvNotionFile" accept=".csv,text/csv" style="display: none;">
     <input type="file" id="csvKolFile" accept=".csv,text/csv" style="display: none;">
+    <input type="file" id="csvSalesFile" accept=".csv,text/csv" style="display: none;">
 
     <script src="data/pantau-core.js"></script>
     <script>
@@ -2576,6 +2631,8 @@
             publishAccount: 'Senovshop',
             dpPercent: 30,
             targetCpm: 100000,
+            toleransiTelat: 1,
+            budgetBulanan: 0,
             overpricePercent: 50
         };
 
@@ -2627,7 +2684,7 @@
             }
         }
 
-        const NUMBER_SETTINGS = ['lowQuotaVideos', 'lowQuotaPercent', 'contractEndingSoon', 'behindThreshold', 'dpPercent', 'targetCpm', 'overpricePercent'];
+        const NUMBER_SETTINGS = ['lowQuotaVideos', 'lowQuotaPercent', 'contractEndingSoon', 'behindThreshold', 'dpPercent', 'targetCpm', 'overpricePercent', 'toleransiTelat', 'budgetBulanan'];
         const TEXT_SETTINGS = ['letterheadName', 'letterheadAddress', 'letterheadEmail', 'letterheadPhone',
                                'companyName', 'companyAddress', 'companyRep', 'companySignBrand', 'publishAccount'];
 
@@ -2768,7 +2825,9 @@
                 overdue: [],
                 behind: [],
                 low: [],
-                soon: []
+                soon: [],
+                perpanjang: [],
+                bayar: []
             };
 
             for (const talent of state.talents) {
@@ -2841,6 +2900,26 @@
             return alerts;
         }
 
+        // Grup tambahan: keputusan perpanjang & pembayaran jatuh tempo.
+        function tambahAlertBaru(alerts) {
+            const batas = Number(state.setelan.contractEndingSoon) || 14;
+            state.talents.forEach(t => {
+                const m = metricsFor(t);
+                if ((m.daysLeft !== null && m.daysLeft <= batas && m.daysLeft >= -7) || (m.remaining === 0 && m.daysLeft !== null && m.daysLeft >= -7)) {
+                    const r = skorTalent(t);
+                    alerts.perpanjang.push({ talentId: t.id, name: t.name, account: t.account, r,
+                        detail: (m.daysLeft < 0 ? 'Berakhir ' + Math.abs(m.daysLeft) + ' hari lalu' : m.daysLeft === 0 ? 'Berakhir hari ini' : 'Berakhir ' + m.daysLeft + ' hari lagi') +
+                            (m.over ? ' · kuota terpenuhi +' + m.over : m.remaining ? ' · sisa ' + m.remaining : ' · kuota terpenuhi') });
+                }
+            });
+            const minggu = PantauCore.addDays(todayIso(), 7);
+            semuaPembayaran().filter(p => !p.lunas && p.date <= minggu).forEach(p => {
+                alerts.bayar.push({ talentId: p.t.id, name: p.t.name, account: p.t.account, key: p.key, terlambat: p.status === 'terlambat',
+                    detail: p.jenis + ' kontrak #' + p.kontrakNo + ' · ' + formatCurrency(p.jumlah) + ' · ' + (p.status === 'terlambat' ? 'jatuh tempo ' + formatDate(p.date) : formatDate(p.date)) });
+            });
+            return alerts;
+        }
+
         function renderSummaryCards(alerts) {
             const activeTalents = state.talents.filter(t => daysUntil(t.endDate) >= 0).length;
             const currentMonth = todayIso().slice(0, 7);
@@ -2861,7 +2940,7 @@
         }
 
         function renderTodayTab() {
-            const alerts = generateTodayAlerts();
+            const alerts = tambahAlertBaru(generateTodayAlerts());
             const hasAny = Object.values(alerts).some(arr => arr.length > 0);
             const summary = renderSummaryCards(alerts);
 
@@ -2975,7 +3054,45 @@
                 });
             }
 
+            if (alerts.perpanjang.length > 0) {
+                html += '<div class="alert-group-title">🔁 Perlu Keputusan Perpanjang</div>';
+                alerts.perpanjang.forEach(a => {
+                    html += `
+                        <div class="alert-item soon" data-alert-perpanjang="${a.talentId}">
+                            <div class="alert-item-content">
+                                <div class="alert-item-title">${escapeHtml(a.name)} ${lencanaSaran(a.r)}</div>
+                                <div class="alert-item-detail">${escapeHtml(a.account)} • ${a.detail}${a.r.hargaUsulan !== null && a.r.hargaUsulan < a.r.nilaiKini ? ' · usulan ' + formatCurrency(a.r.hargaUsulan) : ''}</div>
+                            </div>
+                            <div class="alert-item-action">
+                                <button class="button button-small button-primary" data-renew-talent="${a.talentId}">Perpanjang</button>
+                            </div>
+                        </div>`;
+                });
+            }
+
+            if (alerts.bayar.length > 0) {
+                html += '<div class="alert-group-title">💸 Pembayaran Talent</div>';
+                alerts.bayar.forEach(a => {
+                    html += `
+                        <div class="alert-item ${a.terlambat ? 'overdue' : 'low'}" data-alert-bayar="${a.talentId}">
+                            <div class="alert-item-content">
+                                <div class="alert-item-title">${escapeHtml(a.name)}</div>
+                                <div class="alert-item-detail"><span class="status-tag">${a.terlambat ? 'Terlambat' : 'Minggu ini'}</span>${a.detail}</div>
+                            </div>
+                            <div class="alert-item-action">
+                                <button class="button button-small button-primary" data-bayar="${a.talentId}|${a.key}">Tandai dibayar</button>
+                            </div>
+                        </div>`;
+                });
+            }
+
             html += '</div>';
+            const budget = Number(state.setelan.budgetBulanan) || 0;
+            const kas = budget ? kasBulan(todayIso().slice(0, 7)) : 0;
+            if (budget && kas > budget) {
+                html = `<div class="alert-item overdue" data-alert-budget><div class="alert-item-content"><div class="alert-item-title">Anggaran bulan ini terlewati</div><div class="alert-item-detail">Jadwal bayar ${formatCurrency(kas)} dari anggaran ${formatCurrency(budget)} (+${formatCurrency(kas - budget)})</div></div></div>` + html;
+            }
+            html = '<div class="today-actions"><button type="button" class="button button-secondary button-small" data-ringkasan>📨 Kirim ringkasan (WA / Telegram)</button></div>' + html;
             document.getElementById('todayContainer').innerHTML = html;
 
             // Event listeners for quick record buttons
@@ -3115,6 +3232,10 @@
                                     <div class="field-label">Tertinggal / jadwal terlewat</div>
                                     <div class="field-value" data-metric="behind">${m.behind ? m.behind + ' slot lewat tanpa upload' : 'Tidak ada'}</div>
                                 </div>
+                                <div class="field" data-card-layak>
+                                    <div class="field-label">Layak lanjut?</div>
+                                    <div class="field-value">${(() => { const r = skorTalent(talent); return lencanaSaran(r) + (r.alasan.length ? `<div class="price-note">${r.alasan.map(escapeHtml).join(' ')}</div>` : ''); })()}</div>
+                                </div>
                                 <div class="field" data-card-price>
                                     <div class="field-label">Harga per ${PantauCore.contentTypeOf(talent).unit}</div>
                                     <div class="field-value">${(() => { const v = penilaianHarga(talent); const cat = catatanHarga(v, PantauCore.contentTypeOf(talent).unit); return rupiahAtauKosong(v.harga) + ' ' + lencanaHarga(v) + (cat ? `<div class="price-note">${cat}</div>` : ''); })()}</div>
@@ -3222,6 +3343,11 @@
             document.getElementById('talentStartDate').value = mulai;
             document.getElementById('talentEndDate').value = PantauCore.addDays(mulai, Math.max(0, durasi));
             document.getElementById('talentContractDate').value = '';
+            const r = skorTalent(talent);
+            if (r.hargaUsulan !== null && r.hargaUsulan < (Number(talent.value) || 0) && r.saran !== 'data-kurang') {
+                document.getElementById('talentValue').value = r.hargaUsulan;
+                document.getElementById('talentModalTitle').textContent += ' · nilai diisi harga usulan ' + formatCurrency(r.hargaUsulan);
+            }
             // Tanggal pilihan milik periode lama; kontrak baru mulai dari hari tetap/sebar rata.
             if (document.getElementById('talentForm').dataset.schedMode === 'tanggal') {
                 document.getElementById('talentUploadDates').value = '';
@@ -3533,8 +3659,17 @@
                 return;
             }
 
+            const uploadAwal = parseInt(document.getElementById('talentUploadAwal').value, 10) || 0;
+            const isiAwal = t => {
+                if (!uploadAwal) return;
+                PantauCore.backfillUploads(t, PantauCore.currentUploads(t, state.uploads), uploadAwal, todayIso(), 'upload-awal-' + Date.now() + '-')
+                    .forEach(u => state.uploads.push(u));
+            };
+
             if (!talentId) {
-                state.talents.push(Object.assign({ id: 'talent-' + Date.now() }, talentData));
+                const baru = Object.assign({ id: 'talent-' + Date.now() }, talentData);
+                state.talents.push(baru);
+                isiAwal(baru);
                 saveData();
                 render();
                 closeTalentModal();
@@ -3545,7 +3680,12 @@
             // jadwal) dipertahankan; perubahan jadwal ditunjukkan dulu.
             const lama = state.talents.find(t => t.id === talentId);
             const rencana = PantauCore.planContractEdit(lama, talentData, PantauCore.currentUploads(lama, state.uploads), todayIso(), new Date().toISOString());
-            if (!rencana.changes.length) { closeTalentModal(); return; }
+            if (!rencana.changes.length) {
+                if (uploadAwal) { isiAwal(lama); saveData(); render(); }
+                closeTalentModal();
+                return;
+            }
+            if (uploadAwal) rencana.uploadAwal = uploadAwal;
             if (rencana.scheduleChanged) { bukaDampakJadwal(rencana); return; }
             terapkanEditKontrak(rencana);
         });
@@ -3554,6 +3694,10 @@
             const idx = state.talents.findIndex(t => t.id === rencana.talent.id);
             if (idx === -1) return;
             state.talents[idx] = rencana.talent;
+            if (rencana.uploadAwal) {
+                PantauCore.backfillUploads(rencana.talent, PantauCore.currentUploads(rencana.talent, state.uploads), rencana.uploadAwal, todayIso(), 'upload-awal-' + Date.now() + '-')
+                    .forEach(u => state.uploads.push(u));
+            }
             saveData();
             render();
             closeTalentModal();
@@ -4579,16 +4723,22 @@
                 const u = state.uploads.find(x => x.id === k.uploadId);
                 if (u) u.notionId = k.notionId;
             });
+            rencana.lengkapi.forEach(k => {
+                const u = state.uploads.find(x => x.id === k.uploadId);
+                if (u) { u.title = k.title; u.link = k.link; }
+            });
             rencana.baru.forEach(u => state.uploads.push(u));
 
             const tambah = rencana.baru.length;
-            if (tambah || rencana.klaim.length) { saveData(); render(); }
+            if (tambah || rencana.klaim.length || rencana.lengkapi.length) { saveData(); render(); }
 
             const laporan = Object.keys(rencana.laporan).map(k => '  ' + k + ': +' + rencana.laporan[k]);
             alert(
                 (tambah ? tambah + ' riwayat baru ditambahkan:\n' + laporan.join('\n')
                         : 'Tidak ada riwayat baru. Semua sudah tercatat.') +
                 (rencana.duplikat ? '\n\n' + rencana.duplikat + ' baris sudah pernah diimpor, dilewati.' : '') +
+                (rencana.lengkapi.length ? '\n' + rencana.lengkapi.length + ' entri lama dilengkapi judul/tautan.' : '') +
+                (rencana.belumTayang ? '\n' + rencana.belumTayang + ' baris belum berstatus tayang, tidak dihitung.' : '') +
                 (rencana.asing.length ? '\n\nNama di Notion yang belum punya talent di sini:\n  ' +
                     rencana.asing.slice(0, 15).join(', ') : '')
             );
@@ -4886,12 +5036,16 @@
                         <td>${a && a.denganViews ? angka(a.views) : '<span class="text-muted">&mdash;</span>'}</td>
                         <td data-col="cpm">${rupiahAtauKosong(met.cpm)}</td>
                         <td>${rupiahAtauKosong(met.cpc)}</td>
+                        <td>${rupiahAtauKosong(gmvBulan(t, terpilih))}</td>
+                        <td data-col="roas">${gmvBulan(t, terpilih) !== null && biaya ? (gmvBulan(t, terpilih) / biaya).toFixed(1).replace('.', ',') + '×' : '<span class="text-muted">&mdash;</span>'}</td>
                         <td class="left">${lencanaHarga(v)}${catatanHarga(v, unit) ? `<div class="price-note">${catatanHarga(v, unit)}</div>` : ''}</td>
                     </tr>`
                 };
             });
 
             const cpmBulan = PantauCore.costMetrics({ biaya: biayaBerviews, views: totViews || null }).cpm;
+            const gmvTot = state.talents.reduce((s2, t) => s2 + (gmvBulan(t, terpilih) || 0), 0);
+            const budget = Number(state.setelan.budgetBulanan) || 0;
             const cpcBulan = PantauCore.costMetrics({ biaya: biayaBerklik, klik: totKlik || null }).cpc;
             const mahal = baris.filter(b => b.v.status === 'overprice' || b.v.status === 'di-atas' || b.v.status === 'cek');
 
@@ -4901,6 +5055,8 @@
                     <div class="summary-card"><span class="summary-value" data-summary="kas">${formatCurrency(totKas)}</span><span class="summary-label">Jadwal bayar (DP + pelunasan)</span></div>
                     <div class="summary-card"><span class="summary-value">${totKonten}${totBonus ? `<small> +${totBonus}</small>` : ''}</span><span class="summary-label">Konten tayang${totBonus ? ' (+bonus)' : ''}</span></div>
                     <div class="summary-card"><span class="summary-value">${cpmBulan === null ? '&mdash;' : formatCurrency(Math.round(cpmBulan))}</span><span class="summary-label">CPM bulan ini${cpcBulan !== null ? ' &middot; CPC ' + formatCurrency(Math.round(cpcBulan)) : ''}</span></div>
+                    ${gmvTot ? `<div class="summary-card"><span class="summary-value" data-summary="roas">${totBiaya ? (gmvTot / totBiaya).toFixed(1).replace('.', ',') + '×' : '&mdash;'}</span><span class="summary-label">ROAS &middot; GMV ${formatCurrency(Math.round(gmvTot))}</span></div>` : ''}
+                    ${budget ? `<div class="summary-card${totKas > budget ? ' is-over-budget' : ''}"><span class="summary-value" data-summary="budget">${Math.round(totKas / budget * 100)}%</span><span class="summary-label">Anggaran ${formatCurrency(budget)}${totKas > budget ? ' &middot; lewat ' + formatCurrency(totKas - budget) : ''}</span></div>` : ''}
                 </div>`;
 
             if (mahal.length) {
@@ -4914,12 +5070,13 @@
             }
 
             html += `
+                ${renderLayakLanjut()}
                 <div class="form-section-title">Per talent &middot; ${namaBulan(terpilih)}</div>
                 <div class="table-wrapper">
                     <table class="biaya-table">
                         <thead><tr>
                             <th class="left">Talent</th><th>Harga/konten</th><th>Tayang</th><th>Biaya konten</th>
-                            <th>Jadwal bayar</th><th>Views</th><th>CPM</th><th>CPC</th><th class="left">Penilaian harga</th>
+                            <th>Jadwal bayar</th><th>Views</th><th>CPM</th><th>CPC</th><th>GMV</th><th>ROAS</th><th class="left">Penilaian harga</th>
                         </tr></thead>
                         <tbody>${baris.map(b => b.html).join('')}</tbody>
                     </table>
@@ -4932,6 +5089,7 @@
                 : (((ledger[t.id] || {})[m]) || { biaya: 0 }).biaya;
             const totalKolom = bulan.map(m => state.talents.reduce((s, t) => s + sel(m, t), 0));
 
+            html += renderPembayaran();
             html += `
                 <div class="form-section-title biaya-matrix-head">
                     <span>Pengeluaran per bulan</span>
@@ -5003,7 +5161,7 @@
         function hitungKalkulator() {
             const val = id => PantauCore.numOrNull(document.getElementById(id).value);
             const biaya = val('calcBiaya'), views = val('calcViews'), klik = val('calcKlik'),
-                interaksi = val('calcInteraksi'), konten = val('calcKonten');
+                interaksi = val('calcInteraksi'), konten = val('calcKonten'), gmv = val('calcGmv');
             const m = PantauCore.costMetrics({ biaya, views, klik, interaksi });
             const target = Number(state.setelan.targetCpm) || 0;
             const viewsPerKonten = views !== null && konten ? views / konten : null;
@@ -5028,12 +5186,13 @@
                     ${kotak('CPE', rupiahAtauKosong(m.cpe), 'biaya per interaksi', 'cpe')}
                     ${kotak('ER', m.er === null ? '&mdash;' : m.er.toFixed(2).replace('.', ',') + '%', 'interaksi &divide; views', 'er')}
                     ${kotak('CTR', m.ctr === null ? '&mdash;' : m.ctr.toFixed(2).replace('.', ',') + '%', 'klik &divide; views', 'ctr')}
+                    ${gmv !== null ? kotak('ROAS', biaya ? (gmv / biaya).toFixed(2).replace('.', ',') + '×' : '&mdash;', 'penjualan &divide; biaya', 'roas') : ''}
                 </div>
                 ${vonis}
                 <p class="form-section-note">Target CPM sekarang ${formatCurrency(target)} &mdash; ubah di tab Ambang Peringatan.</p>`;
         }
 
-        ['calcBiaya', 'calcViews', 'calcKlik', 'calcInteraksi', 'calcKonten'].forEach(id => {
+        ['calcBiaya', 'calcViews', 'calcKlik', 'calcInteraksi', 'calcKonten', 'calcGmv'].forEach(id => {
             document.getElementById(id).addEventListener('input', hitungKalkulator);
         });
 
@@ -5077,7 +5236,8 @@
         function bacaKalkulator() {
             const val = id => PantauCore.numOrNull(document.getElementById(id).value);
             const isi = { biaya: val('calcBiaya'), views: val('calcViews'), klik: val('calcKlik'),
-                interaksi: val('calcInteraksi'), konten: val('calcKonten') };
+                interaksi: val('calcInteraksi'), konten: val('calcKonten'), gmv: val('calcGmv') };
+            isi.roas = isi.gmv !== null && isi.biaya ? isi.gmv / isi.biaya : null;
             return Object.assign(isi, PantauCore.costMetrics(isi));
         }
 
@@ -5731,6 +5891,222 @@
                 else window.addEventListener('load', () => window.setTimeout(aktifkanMecha, 300), { once: true });
             }
         })();
+
+        // ============================================================================
+        // LAYAK LANJUT · PEMBAYARAN · PENJUALAN · RINGKASAN
+        // ============================================================================
+
+        const SARAN = {
+            'lanjut':      { label: 'Lanjutkan', cls: 'ok', ikon: '✅' },
+            'negosiasi':   { label: 'Negosiasi harga', cls: 'warn', ikon: '🟡' },
+            'stop':        { label: 'Jangan dilanjutkan', cls: 'danger', ikon: '❌' },
+            'data-kurang': { label: 'Data belum cukup', cls: 'muted', ikon: '⚪' }
+        };
+
+        function skorTalent(t) {
+            const jenis = PantauCore.contentTypeOf(t).id;
+            const lain = state.talents.filter(x => x.id !== t.id);
+            return PantauCore.renewalScore(t, state.uploads, {
+                today: todayIso(),
+                toleransi: state.setelan.toleransiTelat,
+                targetCpm: state.setelan.targetCpm,
+                overpricePercent: state.setelan.overpricePercent,
+                peerPrices: lain.filter(x => PantauCore.contentTypeOf(x).id === jenis).map(PantauCore.pricePerContent),
+                peerEr: lain.map(x => PantauCore.talentEr(x, state.uploads)),
+                snapshot: analitikTerakhir(t)
+            });
+        }
+
+        function lencanaSaran(r) {
+            const s = SARAN[r.saran];
+            return `<span class="price-badge ${s.cls}" data-saran="${r.saran}">${s.ikon} ${s.label}${r.skor !== null && r.saran !== 'data-kurang' ? ' · ' + r.skor : ''}</span>`;
+        }
+
+        function persen(x) {
+            return x === null || x === undefined ? '<span class="text-muted">&mdash;</span>' : Math.round(x) + '';
+        }
+
+        function renderLayakLanjut() {
+            const daftar = state.talents.map(t => ({ t, r: skorTalent(t) }))
+                .sort((a, b) => String(a.t.endDate).localeCompare(String(b.t.endDate)));
+            if (!daftar.length) return '';
+            return `
+                <div class="form-section-title">Layak Lanjut? &middot; urut dari kontrak yang paling dulu berakhir</div>
+                <div class="table-wrapper">
+                    <table class="biaya-table" id="layakTable">
+                        <thead><tr>
+                            <th class="left">Talent</th><th>Berakhir</th><th>Harga</th><th>Disiplin</th><th>ER</th><th>Kuota</th>
+                            <th>Skor</th><th class="left">Saran</th><th>Harga usulan</th><th></th>
+                        </tr></thead>
+                        <tbody>${daftar.map(({ t, r }) => `
+                            <tr data-layak="${t.id}">
+                                <td class="left"><strong>${escapeHtml(t.name)}</strong><div class="text-muted">@${escapeHtml(t.account)}</div></td>
+                                <td>${formatDate(t.endDate)}${r.daysLeft !== null ? `<div class="text-muted">${r.daysLeft < 0 ? 'selesai' : r.daysLeft + ' hari lagi'}</div>` : ''}</td>
+                                <td>${persen(r.komponen.harga)}</td><td>${persen(r.komponen.disiplin)}</td>
+                                <td>${persen(r.komponen.er)}</td><td>${persen(r.komponen.kuota)}</td>
+                                <td><strong>${r.skor === null ? '&mdash;' : r.skor}</strong></td>
+                                <td class="left">${lencanaSaran(r)}${r.alasan.length ? `<div class="price-note">${r.alasan.map(escapeHtml).join(' ')}</div>` : ''}</td>
+                                <td>${r.hargaUsulan === null ? '<span class="text-muted">&mdash;</span>' : formatCurrency(r.hargaUsulan) +
+                                    (r.hargaUsulan < r.nilaiKini ? `<div class="text-muted">&minus;${Math.round((1 - r.hargaUsulan / r.nilaiKini) * 100)}%</div>` : '<div class="text-muted">tetap</div>')}</td>
+                                <td><button type="button" class="button button-small button-secondary" data-renew-talent="${t.id}">🔁 Perpanjang</button></td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+                <p class="form-section-note">Skor = Harga 35% + Disiplin upload 30% + ER 20% + Kuota 15% (komponen tanpa data tidak dihitung). &ge;75 lanjutkan, 55&ndash;74 negosiasi, &lt;55 jangan. Toleransi telat ${Number(state.setelan.toleransiTelat) || 0} hari &mdash; ubah di Ambang Peringatan.</p>`;
+        }
+
+        // ---- Pembayaran ----------------------------------------------------
+        const STATUS_BAYAR = {
+            'lunas':     { label: 'Lunas', cls: 'ok' },
+            'terlambat': { label: 'Terlambat', cls: 'danger' },
+            'bulan-ini': { label: 'Bulan ini', cls: 'warn' },
+            'nanti':     { label: 'Nanti', cls: 'muted' }
+        };
+
+        function semuaPembayaran() {
+            const out = [];
+            state.talents.forEach(t => PantauCore.paymentsOf(t, effectiveDp, todayIso()).forEach(p => out.push(Object.assign({ t }, p))));
+            return out.sort((a, b) => String(a.date).localeCompare(String(b.date)));
+        }
+
+        function renderPembayaran() {
+            const semua = semuaPembayaran();
+            if (!semua.length) return '';
+            const belum = semua.filter(p => !p.lunas);
+            const terlambat = belum.filter(p => p.status === 'terlambat').reduce((s, p) => s + p.jumlah, 0);
+            const bulanIni = belum.filter(p => p.status === 'bulan-ini').reduce((s, p) => s + p.jumlah, 0);
+            const tampil = semua.filter(p => !p.lunas || p.month >= PantauCore.addDays(todayIso(), -62).slice(0, 7));
+            return `
+                <div class="form-section-title biaya-matrix-head">
+                    <span>Pembayaran talent</span>
+                    <span class="text-muted pay-sum">Terlambat <strong class="pay-late">${formatCurrency(terlambat)}</strong> &middot; Jatuh tempo bulan ini <strong>${formatCurrency(bulanIni)}</strong></span>
+                </div>
+                <div class="table-wrapper">
+                    <table class="biaya-table" id="bayarTable">
+                        <thead><tr><th class="left">Talent</th><th>Kontrak</th><th>Jenis</th><th>Jatuh tempo</th><th>Jumlah</th><th class="left">Status</th><th></th></tr></thead>
+                        <tbody>${tampil.map(p => `
+                            <tr data-bayar-row="${p.t.id}|${p.key}">
+                                <td class="left">${escapeHtml(p.t.name)}</td><td>#${p.kontrakNo}</td><td>${p.jenis}</td>
+                                <td>${formatDate(p.date)}</td><td>${formatCurrency(p.jumlah)}</td>
+                                <td class="left"><span class="price-badge ${STATUS_BAYAR[p.status].cls}" data-bayar-status="${p.status}">${STATUS_BAYAR[p.status].label}</span>
+                                    ${p.lunas ? `<div class="price-note">Dibayar ${formatDate(p.lunas.tgl)}${p.lunas.catatan ? ' &middot; ' + escapeHtml(p.lunas.catatan) : ''}</div>` : ''}</td>
+                                <td><button type="button" class="button button-small ${p.lunas ? 'button-secondary' : 'button-primary'}" data-bayar="${p.t.id}|${p.key}">${p.lunas ? 'Batalkan' : 'Tandai dibayar'}</button></td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+        }
+
+        document.addEventListener('click', e => {
+            const b = e.target.closest('[data-bayar]');
+            if (!b || modeLihat()) return;
+            const [talentId, key] = b.dataset.bayar.split('|');
+            const t = state.talents.find(x => x.id === talentId);
+            if (!t) return;
+            const sudah = (t.bayar || {})[key];
+            if (sudah) {
+                if (!confirm('Batalkan tanda lunas ' + key.replace(/^k\d+-/, '') + ' untuk ' + t.name + '?')) return;
+                t.bayar = Object.assign({}, t.bayar);
+                delete t.bayar[key];
+            } else {
+                const tgl = window.prompt('Tanggal dibayar (YYYY-MM-DD):', todayIso());
+                if (tgl === null) return;
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(tgl.trim())) { alert('Format tanggal harus YYYY-MM-DD.'); return; }
+                const catatan = window.prompt('Catatan (opsional, mis. no. transfer / bank):', '') || '';
+                t.bayar = Object.assign({}, t.bayar, { [key]: { tgl: tgl.trim(), catatan: catatan.trim() } });
+            }
+            saveData();
+            render();
+        });
+
+        // ---- Penjualan (ROAS) ---------------------------------------------
+        function gmvBulan(t, bulan) {
+            const p = (t.penjualan || {})[bulan];
+            return p ? p.gmv : null;
+        }
+
+        function importCsvPenjualan(teks) {
+            const bulan = document.getElementById('biayaMonth').value || PantauCore.monthOf(todayIso());
+            const r = PantauCore.salesFromCsv(teks, state.talents, bulan);
+            if (r.error === 'kosong') { alert('Berkas CSV kosong.'); return; }
+            if (r.error === 'kolom') {
+                alert('Kolom kreator/username atau GMV/penjualan tidak ditemukan.\n\nKolom yang terbaca:\n' + r.header.join(', '));
+                return;
+            }
+            let n = 0;
+            Object.keys(r.hasil).forEach(id => {
+                const t = state.talents.find(x => x.id === id);
+                t.penjualan = Object.assign({}, t.penjualan, r.hasil[id]);
+                n++;
+            });
+            if (n) { saveData(); render(); }
+            alert('Penjualan diperbarui untuk ' + n + ' talent.' +
+                (r.asing.length ? '\n\nKreator yang tidak cocok dengan akun talent mana pun:\n' + r.asing.slice(0, 15).join(', ') : ''));
+            return r;
+        }
+
+        document.getElementById('csvSalesBtn').addEventListener('click', () => document.getElementById('csvSalesFile').click());
+        document.getElementById('csvSalesFile').addEventListener('change', e => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const rd = new FileReader();
+            rd.onload = ev => importCsvPenjualan(ev.target.result);
+            rd.readAsText(f);
+            e.target.value = '';
+        });
+
+        // ---- Ringkasan untuk WhatsApp / Telegram ---------------------------
+        function teksRingkasan() {
+            return PantauCore.dailySummary(state, todayIso(), {
+                contractEndingSoon: state.setelan.contractEndingSoon,
+                dpOf: effectiveDp
+            });
+        }
+
+        function bukaRingkasan() {
+            document.getElementById('ringkasanText').value = teksRingkasan();
+            document.getElementById('ringkasanMsg').textContent = '';
+            document.getElementById('ringkasanTgBtn').hidden = !(online && online.mode === 'owner');
+            document.getElementById('ringkasanModal').classList.add('active');
+        }
+
+        function tutupRingkasan() {
+            document.getElementById('ringkasanModal').classList.remove('active');
+        }
+
+        document.addEventListener('click', e => { if (e.target.closest('[data-ringkasan]')) bukaRingkasan(); });
+        document.getElementById('ringkasanCloseBtn').addEventListener('click', tutupRingkasan);
+        document.querySelector('#ringkasanModal .modal-close').addEventListener('click', tutupRingkasan);
+        document.getElementById('ringkasanCopyBtn').addEventListener('click', async () => {
+            const teks = document.getElementById('ringkasanText').value;
+            try { await navigator.clipboard.writeText(teks); document.getElementById('ringkasanMsg').textContent = 'Tersalin.'; }
+            catch (err) { document.getElementById('ringkasanText').select(); document.getElementById('ringkasanMsg').textContent = 'Tekan Ctrl+C untuk menyalin.'; }
+        });
+        document.getElementById('ringkasanWaBtn').addEventListener('click', () => {
+            const teks = document.getElementById('ringkasanText').value;
+            window.open('https://wa.me/?text=' + encodeURIComponent(teks), '_blank', 'noopener');
+        });
+        document.getElementById('ringkasanTgBtn').addEventListener('click', async () => {
+            const msg = document.getElementById('ringkasanMsg');
+            msg.textContent = 'Mengirim ke Telegram…';
+            try {
+                const r = await fetch('api/notify', {
+                    method: 'POST',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, headerOnline()),
+                    body: JSON.stringify({ text: document.getElementById('ringkasanText').value })
+                });
+                const res = await r.json().catch(() => ({}));
+                msg.textContent = r.ok ? 'Terkirim ke Telegram ✓' : 'Gagal: ' + (res.error || 'HTTP ' + r.status) + (res.detail ? ' (' + res.detail + ')' : '');
+            } catch (err) {
+                msg.textContent = 'Gagal menghubungi server.';
+            }
+        });
+
+        // ---- Anggaran bulanan ---------------------------------------------
+        function kasBulan(bulan) {
+            return semuaPembayaran().filter(p => p.month === bulan).reduce((s, p) => s + p.jumlah, 0);
+        }
 
         // ============================================================================
         // RENDER FUNCTION

@@ -266,6 +266,9 @@
         const iNama = kepala.indexOf('content name');
         const iTgl = kepala.indexOf('film date');
         const iId = kepala.findIndex(h => KOLOM_ID.indexOf(h) !== -1);
+        const iStatus = kepala.indexOf('status');
+        const iJudul = kepala.findIndex(h => ['judul', 'title', 'caption', 'judul konten', 'topik', 'konten'].indexOf(h) !== -1);
+        const iLink = kepala.findIndex(h => ['link', 'link video', 'link konten', 'tautan', 'video link', 'post link', 'link post', 'link tiktok', 'link upload'].indexOf(h) !== -1);
         if (iNama === -1 || iTgl === -1) return { error: 'kolom', header: baris[0], rows: [], tanggalGagal: 0 };
 
         const rows = [];
@@ -275,7 +278,12 @@
             const mentah = String(baris[i][iTgl] || '').trim();
             const tgl = parseTanggalNotion(mentah);
             if (nama && tgl) {
-                rows.push({ nama, tgl, notionId: iId === -1 ? '' : normalizeNotionId(baris[i][iId]) });
+                rows.push({
+                    nama, tgl, notionId: iId === -1 ? '' : normalizeNotionId(baris[i][iId]),
+                    status: iStatus === -1 ? null : String(baris[i][iStatus] || '').trim(),
+                    judul: iJudul === -1 ? '' : String(baris[i][iJudul] || '').trim(),
+                    tautan: iLink === -1 ? '' : String(baris[i][iLink] || '').trim()
+                });
             } else if (nama && mentah) tanggalGagal++;
         }
         return { rows, tanggalGagal, adaKolomId: iId !== -1, totalBaris: baris.length - 1 };
@@ -299,6 +307,16 @@
         let duplikat = 0, diLuarPeriode = 0;
 
         const idTerpakai = new Set(uploads.filter(u => u.notionId).map(u => u.notionId));
+        const lengkapi = [];   // { uploadId, title, link } untuk entri lama tanpa judul/tautan
+        let belumTayang = 0;
+        // Status yang dihitung tayang. Kolom Status tidak ada = semua baris dihitung (perilaku lama).
+        const TAYANG = ['published', 'posted', 'sudah tayang', 'tayang', 'done', 'selesai', 'uploaded', 'upload', 'sudah upload', 'live', 'complete', 'completed'];
+        const isiLengkapi = (u, r) => {
+            const judulKosong = !u.title || u.title === 'Dari Notion Content Calendar';
+            if ((judulKosong && r.judul) || (!u.link && r.tautan)) {
+                lengkapi.push({ uploadId: u.id, title: judulKosong && r.judul ? r.judul : u.title, link: u.link || r.tautan || '' });
+            }
+        };
         const diklaim = new Set();
         const kunciTalent = t => String(t.notionName || t.account || '').trim().toLowerCase();
         const kenal = new Set(talents.map(kunciTalent).filter(Boolean));
@@ -319,33 +337,41 @@
                 if (String(r.nama || '').trim().toLowerCase() !== kunci) return;
                 const dalamKontrak = contractsOf(t).some(c => r.tgl >= c.startDate && r.tgl <= c.endDate);
                 if (!dalamKontrak || r.tgl > today) { diLuarPeriode++; return; }
+                if (r.status !== null && r.status !== undefined && TAYANG.indexOf(String(r.status).toLowerCase()) === -1) { belumTayang++; return; }
 
                 const nid = r.notionId || '';
                 if (nid) {
-                    if (idTerpakai.has(nid)) { duplikat++; return; }
+                    if (idTerpakai.has(nid)) {
+                        const ada = milik.find(u => u.notionId === nid);
+                        if (ada) isiLengkapi(ada, r);
+                        duplikat++;
+                        return;
+                    }
                     const lama = milik.find(u => !u.notionId && u.date === r.tgl && !diklaim.has(u.id));
                     if (lama) {
                         diklaim.add(lama.id); idTerpakai.add(nid);
                         klaim.push({ uploadId: lama.id, notionId: nid });
+                        isiLengkapi(lama, r);
                         duplikat++;
                         return;
                     }
                     idTerpakai.add(nid);
                 } else {
-                    if (milik.some(u => u.date === r.tgl) || tanggalBaru.has(r.tgl)) { duplikat++; return; }
+                    const sama = milik.find(u => u.date === r.tgl);
+                    if (sama || tanggalBaru.has(r.tgl)) { if (sama) isiLengkapi(sama, r); duplikat++; return; }
                 }
                 tanggalBaru.add(r.tgl);
                 baru.push({
                     id: 'upload-notion-' + t.id + '-' + (nid || r.tgl),
                     talentId: t.id, date: r.tgl,
-                    title: 'Dari Notion Content Calendar', link: '',
+                    title: r.judul || 'Dari Notion Content Calendar', link: r.tautan || '',
                     source: 'notion', notionId: nid
                 });
                 laporan[t.account] = (laporan[t.account] || 0) + 1;
             });
         });
 
-        return { baru, klaim, duplikat, diLuarPeriode, asing, laporan };
+        return { baru, klaim, lengkapi, duplikat, diLuarPeriode, belumTayang, asing, laporan };
     }
 
     /**
@@ -911,7 +937,213 @@
         return uploads;
     }
 
+    // ------------------------------------------------------------------------
+    // Layak lanjut? — skor perpanjangan kontrak
+    // ------------------------------------------------------------------------
+
+    const BOBOT_SKOR = { harga: 35, disiplin: 30, er: 20, kuota: 15 };
+
+    // ER talent (%) dari upload yang punya views & interaksi, atau dari
+    // analitik tersimpan terakhir.
+    function talentEr(talent, uploads) {
+        const ada = uploads.filter(u => u.talentId === talent.id && numOrNull(u.views) > 0 && numOrNull(u.interaksi) !== null);
+        if (ada.length) {
+            const v = ada.reduce((s, u) => s + numOrNull(u.views), 0);
+            const i = ada.reduce((s, u) => s + numOrNull(u.interaksi), 0);
+            return v > 0 ? i / v * 100 : null;
+        }
+        const a = (talent.analitik || []).slice(-1)[0];
+        return a && numOrNull(a.views) > 0 && numOrNull(a.interaksi) !== null ? numOrNull(a.interaksi) / numOrNull(a.views) * 100 : null;
+    }
+
+    /**
+     * Skor 0–100 dari empat komponen (bobot: harga 35, disiplin 30, ER 20,
+     * kuota 15; komponen tanpa data dikeluarkan dan bobot dibagi ulang).
+     *  - harga: harga/konten ≤ harga wajar = 100, 2× = 0
+     *  - disiplin: % jadwal yang lewat dan terisi tepat waktu (toleransi N hari)
+     *  - ER: dibanding median ER talent lain (≥ median = 100)
+     *  - kuota: konten tayang ÷ target sampai hari ini (atau ÷ kuota bila selesai)
+     * Penilaian harga dari < 3 konten ber-views → "data belum cukup".
+     */
+    function renewalScore(talent, uploadsAll, opts) {
+        const today = opts.today;
+        const toleransi = Number(opts.toleransi) || 0;
+        const kini = currentUploads(talent, uploadsAll);
+        const m = talentMetrics(talent, kini, today);
+        const verdict = priceVerdict(talent, uploadsAll, opts);
+        const alasan = [];
+        const komp = { harga: null, disiplin: null, er: null, kuota: null };
+
+        if (verdict.hargaWajar !== null && isFinite(verdict.rasio)) {
+            komp.harga = Math.max(0, Math.min(100, (2 - verdict.rasio) * 100));
+            if (verdict.rasio > 1) alasan.push('Harga ' + verdict.rasio.toFixed(1).replace('.', ',') + '× harga wajar.');
+        }
+
+        const lewat = m.slots.filter(s => s.date < today);
+        if (lewat.length) {
+            const tepat = lewat.filter(s => {
+                if (!s.uploadId) return false;
+                const u = kini.find(x => x.id === s.uploadId);
+                return u && daysBetween(s.date, u.date) <= toleransi;
+            }).length;
+            komp.disiplin = tepat / lewat.length * 100;
+            if (lewat.length - tepat) alasan.push((lewat.length - tepat) + ' dari ' + lewat.length + ' jadwal telat lebih dari ' + toleransi + ' hari atau belum tayang.');
+        }
+
+        const er = talentEr(talent, uploadsAll);
+        const peerEr = median((opts.peerEr || []).filter(x => x !== null && x > 0));
+        if (er !== null && peerEr) {
+            komp.er = Math.max(0, Math.min(100, er / peerEr * 100));
+            if (er < peerEr) alasan.push('ER ' + er.toFixed(1).replace('.', ',') + '% di bawah median talent lain (' + peerEr.toFixed(1).replace('.', ',') + '%).');
+        }
+
+        const selesai = m.daysLeft !== null && m.daysLeft < 0;
+        const pembanding = selesai ? m.quota : m.target;
+        if (pembanding > 0) {
+            komp.kuota = Math.min(100, m.uploaded / pembanding * 100);
+            if (m.uploaded < pembanding) alasan.push(m.uploaded + ' dari ' + pembanding + ' konten ' + (selesai ? 'kuota' : 'target sampai hari ini') + ' tayang.');
+        }
+
+        let total = 0, bobot = 0;
+        Object.keys(BOBOT_SKOR).forEach(k => {
+            if (komp[k] !== null) { total += komp[k] * BOBOT_SKOR[k]; bobot += BOBOT_SKOR[k]; }
+        });
+        const skor = bobot ? Math.round(total / bobot) : null;
+        const dataKurang = verdict.hargaWajar === null || (verdict.sumber !== 'analitik' && verdict.sampel < 3);
+
+        const targetCpm = Number(opts.targetCpm) || 0;
+        // Harga usulan = harga wajar untuk kuota yang sama, tapi tidak pernah
+        // di atas nilai sekarang (talent yang sudah murah tidak dinaikkan).
+        const wajarTotal = verdict.medianViews !== null && targetCpm
+            ? Math.round(verdict.medianViews / 1000 * targetCpm * (parseInt(talent.quota, 10) || 0) / 1000) * 1000
+            : null;
+        const nilai = Number(talent.value) || 0;
+        const hargaUsulan = wajarTotal === null ? null : Math.min(nilai || wajarTotal, wajarTotal);
+
+        const saran = dataKurang || skor === null ? 'data-kurang' : skor >= 75 ? 'lanjut' : skor >= 55 ? 'negosiasi' : 'stop';
+        if (dataKurang) alasan.unshift('Data views belum cukup (minimal 3 konten atau analitik tersimpan).');
+        return { skor, saran, komponen: komp, alasan, hargaUsulan, nilaiKini: Number(talent.value) || 0, daysLeft: m.daysLeft, er };
+    }
+
+    // ------------------------------------------------------------------------
+    // Pembayaran: jadwal + status lunas
+    // ------------------------------------------------------------------------
+
+    /** Semua jadwal bayar talent (semua kontrak) beserta status lunasnya. */
+    function paymentsOf(talent, dpOf, today) {
+        const out = [];
+        contractsOf(talent).forEach(c => {
+            paymentSchedule(c, dpOf(c)).forEach(p => {
+                const key = 'k' + c.no + '-' + p.jenis;
+                const lunas = (talent.bayar || {})[key] || null;
+                out.push(Object.assign({}, p, {
+                    key, kontrakNo: c.no, lunas,
+                    status: lunas ? 'lunas' : p.date < today ? 'terlambat' : p.month === String(today).slice(0, 7) ? 'bulan-ini' : 'nanti'
+                }));
+            });
+        });
+        return out;
+    }
+
+    // ------------------------------------------------------------------------
+    // Ringkasan harian (WhatsApp / Telegram)
+    // ------------------------------------------------------------------------
+
+    function dailySummary(state, today, opts) {
+        const o = opts || {};
+        const hariIni = [], terlewat = [], berakhir = [], bayar = [];
+        const namaHari = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+        const tgl = new Date(parseIso(today));
+        (state.talents || []).forEach(t => {
+            const m = talentMetrics(t, currentUploads(t, state.uploads || []), today);
+            if (m.todaySlotOpen && !m.uploadedToday) hariIni.push(t.name + ' (' + t.account + ')');
+            if (m.behind > 0) terlewat.push(t.name + ' — ' + m.behind + ' jadwal');
+            const batas = Number(o.contractEndingSoon) || 14;
+            if (m.daysLeft !== null && m.daysLeft >= 0 && m.daysLeft <= batas) {
+                berakhir.push(t.name + ' — ' + (m.daysLeft === 0 ? 'hari ini' : m.daysLeft + ' hari lagi') + (m.remaining ? ', sisa ' + m.remaining : ', kuota habis'));
+            }
+            if (o.dpOf) {
+                paymentsOf(t, o.dpOf, today).forEach(p => {
+                    if (!p.lunas && p.date <= addDays(today, 7)) bayar.push(t.name + ' — ' + p.jenis + ' Rp' + Number(p.jumlah).toLocaleString('id-ID') + ' (' + p.date + ')');
+                });
+            }
+        });
+        const blok = (judul, list) => list.length ? '\n' + judul + '\n' + list.map(x => '• ' + x).join('\n') + '\n' : '';
+        return ('📅 Jadwal KOL — ' + namaHari[tgl.getUTCDay()] + ', ' + today + '\n' +
+            blok('🎬 Upload hari ini', hariIni) +
+            blok('⚠️ Jadwal terlewat', terlewat) +
+            blok('⏰ Kontrak berakhir ≤' + (Number(o.contractEndingSoon) || 14) + ' hari', berakhir) +
+            blok('💸 Pembayaran ≤7 hari / terlambat', bayar) +
+            (hariIni.length + terlewat.length + berakhir.length + bayar.length ? '' : '\n✅ Semua aman hari ini.\n')).trim();
+    }
+
+    // ------------------------------------------------------------------------
+    // Penjualan per talent (ROAS) dari laporan affiliate TikTok Shop
+    // ------------------------------------------------------------------------
+
+    const KOLOM_KREATOR = ['creator username', 'creator name', 'creator', 'username', 'nama kreator', 'kreator', 'affiliate', 'nama affiliate', 'akun', 'creator id'];
+    const KOLOM_GMV = ['gmv', 'affiliate gmv', 'revenue', 'omzet', 'pendapatan', 'penjualan', 'total gmv', 'gmv (rp)', 'gmv(rp)', 'nilai penjualan'];
+    const KOLOM_ORDER = ['orders', 'order', 'pesanan', 'jumlah pesanan', 'items sold', 'terjual'];
+    const KOLOM_TGL = ['date', 'tanggal', 'order date', 'tanggal pesanan', 'time', 'waktu'];
+
+    function cariKolom(kepala, daftar) {
+        let i = kepala.findIndex(h => daftar.indexOf(h) !== -1);
+        if (i === -1) i = kepala.findIndex(h => daftar.some(d => h.indexOf(d) !== -1));
+        return i;
+    }
+
+    /**
+     * CSV laporan affiliate → { talentId: { 'YYYY-MM': { gmv, orders } } }.
+     * Kreator dicocokkan ke akun talent (huruf kecil, tanpa simbol). Baris
+     * tanpa tanggal dimasukkan ke `bulanDefault`.
+     */
+    function salesFromCsv(teks, talents, bulanDefault) {
+        const baris = parseCSV(teks);
+        if (baris.length < 2) return { error: 'kosong' };
+        const kepala = baris[0].map(h => String(h).trim().toLowerCase());
+        const iK = cariKolom(kepala, KOLOM_KREATOR), iG = cariKolom(kepala, KOLOM_GMV);
+        const iO = cariKolom(kepala, KOLOM_ORDER), iT = cariKolom(kepala, KOLOM_TGL);
+        if (iK === -1 || iG === -1) return { error: 'kolom', header: baris[0] };
+        const hasil = {}, asing = [];
+        baris.slice(1).forEach(r => {
+            const h = normHandle(r[iK]);
+            const t = h && talents.find(x => normHandle(x.account) === h || normHandle(x.notionName) === h);
+            if (!t) { if (r[iK] && asing.indexOf(String(r[iK]).trim()) === -1) asing.push(String(r[iK]).trim()); return; }
+            const tgl = iT === -1 ? '' : parseTanggalSheet(r[iT]);
+            const bln = tgl ? monthOf(tgl) : bulanDefault;
+            const a = ((hasil[t.id] = hasil[t.id] || {})[bln] = hasil[t.id][bln] || { gmv: 0, orders: 0 });
+            a.gmv += numOrNull(r[iG]) || 0;
+            a.orders += iO === -1 ? 0 : (numOrNull(r[iO]) || 0);
+        });
+        return { hasil, asing };
+    }
+
+    /**
+     * "Sudah tayang sebelum didata": membuat N entri upload pada jadwal
+     * terlewat paling awal yang belum terisi (bila jadwal kurang, sisanya
+     * di tanggal mulai kontrak). Entri ditandai `awal: true`.
+     */
+    function backfillUploads(talent, uploads, n, today, idPrefix) {
+        const jumlah = Math.max(0, parseInt(n, 10) || 0);
+        if (!jumlah) return [];
+        const m = talentMetrics(talent, uploads, today);
+        const kosong = m.slots.filter(s => s.status === 'pending').map(s => s.date);
+        const out = [];
+        for (let i = 0; i < jumlah; i++) {
+            out.push({
+                id: (idPrefix || 'upload-awal-') + talent.id + '-' + i,
+                talentId: talent.id,
+                date: kosong[i] || talent.startDate,
+                title: 'Tayang sebelum didata',
+                link: '',
+                awal: true
+            });
+        }
+        return out;
+    }
+
     root.PantauCore = {
+        backfillUploads, renewalScore, talentEr, BOBOT_SKOR, paymentsOf, dailySummary, salesFromCsv,
         contractsOf, contractForDate, uploadsForContract, currentUploads, outsideContractUploads, renewContract, rescheduleSlots,
         numOrNull, median, monthOf, pricePerContent, monthlyLedger, paymentSchedule, costMetrics, priceVerdict,
         parseTanggalSheet, rowsFromKolCsv, planKolImport, applyKolImport,

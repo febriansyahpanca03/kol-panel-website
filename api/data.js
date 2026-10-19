@@ -27,7 +27,7 @@ const BACKUP_COUNT = 5;
 // Kolom pribadi talent yang tidak boleh terlihat dengan sandi lihat.
 const PRIVATE_FIELDS = ['phone', 'address', 'bank', 'fullName'];
 
-function sameSecret(given, expected) {
+export function sameSecret(given, expected) {
     if (!expected || typeof given !== 'string' || !given) return false;
     const a = Buffer.from(given);
     const b = Buffer.from(expected);
@@ -47,13 +47,13 @@ export function stripPrivate(data) {
     return copy;
 }
 
-function redisConfig() {
+export function redisConfig() {
     const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
     const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
     return url && token ? { url: url.replace(/\/$/, ''), token } : null;
 }
 
-async function redis(cfg, commands) {
+export async function redis(cfg, commands) {
     const r = await fetch(cfg.url + '/pipeline', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + cfg.token, 'Content-Type': 'application/json' },
