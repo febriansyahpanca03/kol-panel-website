@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pantau Talent</title>
+    <meta name="theme-color" content="#060A13">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
@@ -16,44 +17,53 @@
         }
 
         /* ================================================================
-           EMERALD CONSOLE — SATU-SATUNYA SUMBER WARNA
+           MECHA HANGAR — SATU-SATUNYA SUMBER WARNA
            Tidak boleh ada hex literal di luar blok ini.
            ================================================================ */
         :root {
             /* --- permukaan --- */
-            --bg:        #071310;
-            --surface:   #102019;
-            --surface-2: #14291F;
-            --line:      #234438;
+            --bg:        #060A13;
+            --surface:   #0C1422;
+            --surface-2: #121D31;
+            --line:      #22324D;
 
             /* --- teks --- */
-            --txt:       #E6F2EE;   /* 14.7:1 di surface */
-            --txt-muted: #8FB3A4;   /*  7.4:1 di surface */
+            --txt:       #E9EFF8;   /* ±15:1 di surface */
+            --txt-muted: #94A4BF;   /* ±7:1 di surface */
 
             /* --- aksen tunggal --- */
-            --accent:       #34D399;
-            --accent-hover: #5EEAD4;
-            --on-accent:    #071310; /* 9.8:1 di atas accent */
+            --accent:       #3BA7FF;   /* biru thruster */
+            --accent-hover: #7CC4FF;
+            --on-accent:    #04101F; /* ±8:1 di atas accent */
 
             /* --- status: arti tetap, jangan dipakai dekoratif --- */
-            --warn:   #FCD34D;  /* jadwal belum dikonfirmasi */
+            --warn:   #FFC93C;  /* jadwal belum dikonfirmasi */
             --danger: #FF7A7A;  /* tertinggal dari target */
             --ok:     #4ADE80;  /* target tercapai */
-            --info:   #60A5FA;  /* kontrak & kuota */
+            --info:   #38D5F5;  /* kontrak & kuota */
 
             /* --- isi badge: warna status + 15% alpha --- */
-            --warn-bg:   rgba(252, 211, 77, .15);
+            --warn-bg:   rgba(255, 201, 60, .15);
             --danger-bg: rgba(255, 122, 122, .15);
             --ok-bg:     rgba(74, 222, 128, .15);
-            --info-bg:   rgba(96, 165, 250, .15);
+            --info-bg:   rgba(56, 213, 245, .15);
 
             /* --- turunan: bayangan & lapisan, dipakai komponen --- */
-            --shadow-raise: 0 2px 0 rgba(3, 9, 7, .9), 0 10px 24px rgba(3, 9, 7, .45);
-            --shadow-press: 0 1px 0 rgba(3, 9, 7, .9);
-            --accent-ring:  rgba(52, 211, 153, .28);
-            --scrim:        rgba(7, 19, 16, .78);
-            --accent-wash:  rgba(52, 211, 153, .10);
-            --starlight:    rgba(230, 242, 238, .55);
+            --shadow-raise: 0 2px 0 rgba(2, 5, 12, .9), 0 10px 24px rgba(2, 5, 12, .5);
+            --shadow-press: 0 1px 0 rgba(2, 5, 12, .9);
+            --accent-ring:  rgba(59, 167, 255, .30);
+            --scrim:        rgba(6, 10, 19, .80);
+            --accent-wash:  rgba(59, 167, 255, .10);
+            --starlight:    rgba(233, 239, 248, .55);
+
+            /* --- ornamen mecha: hanya dekorasi HUD, bukan warna status --- */
+            --mecha-red:    #FF4D5E;
+            --mecha-yellow: #F5B700;
+            --grid-line:    rgba(59, 167, 255, .05);
+            --scanline:     rgba(233, 239, 248, .025);
+            --glass:        rgba(12, 20, 34, .72);
+            --vignette-mid: rgba(6, 10, 19, .72);
+            --hangar-tint:  rgba(18, 40, 80, .28);
 
             /* --- alias kompatibilitas: komponen lama tetap jalan,
                    tapi nilainya tetap bersumber dari token di atas --- */
@@ -88,7 +98,8 @@
 
             /* --- tipografi --- */
             --font-mono: ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
-            --font-pixel: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+            --font-pixel: 'Rajdhani', 'Inter', sans-serif;
+            --font-display: 'Orbitron', 'Rajdhani', sans-serif;
 
             /* --- motion --- */
             --motion-fast: 120ms;
@@ -1706,43 +1717,284 @@
                 transition-duration: .01ms !important;
             }
         }
+
+        /* ================================================================
+           MECHA HANGAR — lapisan tema terakhir.
+           Navy hangar, biru thruster sebagai aksen tunggal, garis merah &
+           kuning hanya sebagai ornamen HUD (bukan warna status).
+           ================================================================ */
+        body {
+            font-family: 'Rajdhani', 'Inter', -apple-system, 'Segoe UI', sans-serif;
+            font-size: 16px;
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(900px 500px at calc(50% + var(--mx, 0) * 40px) calc(-10% + var(--my, 0) * 30px), var(--accent-wash), transparent 60%),
+                linear-gradient(var(--grid-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: auto, 48px 48px, 48px 48px;
+            background-position: 0 0, calc(var(--mx, 0) * -12px) calc(var(--my, 0) * -12px), calc(var(--mx, 0) * -12px) calc(var(--my, 0) * -12px);
+            background-attachment: fixed;
+        }
+        body::before {
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent) 0 60%, var(--mecha-yellow) 60% 70%, var(--mecha-red) 70% 76%, var(--accent) 76%);
+        }
+        .container { max-width: 1280px; }
+
+        /* sel tabel, isian, dan teks panjang tetap Inter agar mudah dibaca */
+        td, input, select, textarea, .upload-item-title, .alert-item-detail, .price-note,
+        .form-section-note, .setting-description, .empty-state-text, .header-subtitle { font-family: 'Inter', sans-serif; }
+
+        /* ---------------- Hangar (header) ---------------- */
+        .header.hangar {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+            gap: var(--spacing-xl);
+            align-items: stretch;
+            min-height: 0;
+            padding: 0;
+            overflow: visible;
+            background: none;
+            border: 0;
+        }
+        .header.hangar::before { display: none; }
+        .hangar-copy {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 28px 26px;
+            background-color: var(--surface);
+            border: 1px solid var(--line);
+            clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 22px 100%, 0 calc(100% - 22px));
+        }
+        .hangar-copy::after {
+            content: '';
+            position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+            background: linear-gradient(var(--accent), var(--mecha-red));
+        }
+        .hangar-kicker {
+            display: flex; align-items: center; gap: 8px;
+            color: var(--mecha-yellow);
+            font-family: var(--font-display);
+            font-size: 11px; letter-spacing: .22em;
+        }
+        .hud-dot { width: 8px; height: 8px; background: var(--ok); box-shadow: 0 0 10px var(--ok); animation: hudBlink 1.6s steps(2) infinite; }
+        .header.hangar h1 {
+            margin: 10px 0 0;
+            color: var(--txt);
+            font-family: var(--font-display);
+            font-size: clamp(26px, 4vw, 44px);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: .06em;
+            text-shadow: 0 0 24px var(--accent-ring);
+        }
+        .header.hangar .header-subtitle { margin-top: 10px; font-size: 14px; color: var(--txt-muted); }
+        .hangar-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+        .hangar-stat { padding: 8px 10px; background: var(--surface-2); border-left: 2px solid var(--accent); }
+        .hangar-stat b { display: block; font-family: var(--font-display); font-size: 20px; color: var(--accent); line-height: 1.1; }
+        .hangar-stat span { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--txt-muted); }
+        .hangar-stat.alert b { color: var(--warn); }
+        .hangar-stat.alert { border-left-color: var(--warn); }
+
+        .hangar-view {
+            position: relative;
+            min-height: 340px;
+            background:
+                radial-gradient(closest-side at 50% 62%, var(--accent-ring), transparent 75%),
+                linear-gradient(180deg, var(--surface) 0, var(--bg) 100%);
+            border: 1px solid var(--line);
+            overflow: hidden;
+        }
+        .hangar-stage, .hangar-stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+        .hangar-stage iframe { opacity: 0; transition: opacity 600ms ease; }
+        .hangar-stage iframe.ready { opacity: 1; }
+        .hud-corner { position: absolute; width: 22px; height: 22px; z-index: 3; pointer-events: none; border: 2px solid var(--accent); }
+        .hud-corner.tl { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
+        .hud-corner.tr { right: 8px; top: 8px; border-left: 0; border-bottom: 0; }
+        .hud-corner.bl { left: 8px; bottom: 8px; border-right: 0; border-top: 0; }
+        .hud-corner.br { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
+        /* Latar viewer Sketchfab untuk model ini selalu terang (tidak bisa
+           diubah dari luar), jadi tepinya dipudarkan ke navy: mecha tampak
+           seperti di bawah lampu sorot hangar. Lapisan tembus klik. */
+        .hangar-scan {
+            position: absolute; inset: 0; z-index: 2; pointer-events: none;
+            background:
+                repeating-linear-gradient(0deg, transparent 0 3px, var(--scanline) 3px 4px),
+                radial-gradient(ellipse 58% 68% at 50% 56%, transparent 35%, var(--vignette-mid) 70%, var(--bg) 100%),
+                linear-gradient(var(--hangar-tint), var(--hangar-tint));
+        }
+        .hangar-scan::after {
+            content: ''; position: absolute; left: 0; right: 0; height: 60px;
+            background: linear-gradient(180deg, transparent, var(--accent-wash), transparent);
+            animation: scanSweep 4.5s linear infinite;
+        }
+        .hangar-hud-top {
+            position: absolute; left: 40px; right: 40px; top: 14px; z-index: 3; pointer-events: none;
+            display: flex; justify-content: space-between;
+            font-family: var(--font-display); font-size: 10px; letter-spacing: .2em; color: var(--txt-muted);
+        }
+        #hangarState { color: var(--mecha-yellow); }
+        #hangarState.online { color: var(--ok); }
+        .hangar-poster {
+            position: absolute; inset: 0; display: grid; place-items: center; place-content: center; gap: 18px; z-index: 1;
+        }
+        .hangar-poster-ring {
+            width: 150px; height: 150px; border-radius: 50%;
+            border: 2px dashed var(--accent); box-shadow: 0 0 40px var(--accent-ring), inset 0 0 40px var(--accent-wash);
+            animation: ringSpin 12s linear infinite;
+        }
+        .hangar-poster-text { font-family: var(--font-display); letter-spacing: .4em; color: var(--txt-muted); font-size: 12px; text-align: center; }
+        .hangar-controls {
+            position: absolute; left: 12px; right: 12px; bottom: 30px; z-index: 4;
+            display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px;
+        }
+        .hangar-modes, .hangar-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+        .hangar-chip {
+            font-family: var(--font-display); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+            padding: 7px 10px; cursor: pointer;
+            color: var(--txt); background: var(--glass); border: 1px solid var(--line);
+            backdrop-filter: blur(6px);
+            clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+            transition: background-color var(--motion-fast), border-color var(--motion-fast), color var(--motion-fast);
+        }
+        .hangar-chip:hover { border-color: var(--accent); color: var(--accent); }
+        .hangar-chip[aria-pressed="true"], .hangar-chip.active { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+        .hangar-chip:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--mecha-yellow); }
+        .hangar-credit {
+            position: absolute; right: 12px; bottom: 8px; z-index: 4;
+            font-size: 10px; letter-spacing: .04em; color: var(--txt-muted); text-decoration: none;
+        }
+        .hangar-credit:hover { color: var(--accent); text-decoration: underline; }
+        .hangar.mati .hangar-view { min-height: 0; height: 0; border: 0; display: none; }
+        .hangar.mati { grid-template-columns: 1fr; }
+
+        /* ---------------- Tab & tombol bersudut ---------------- */
+        .tabs { background-color: var(--surface); border: 1px solid var(--line); border-radius: 0; gap: 6px; padding: 6px; }
+        .tab-button {
+            font-family: var(--font-display);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border-radius: 0;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+        .tab-button.active {
+            color: var(--on-accent);
+            background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+            box-shadow: inset 0 -3px 0 var(--mecha-yellow);
+        }
+        .tab-button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--mecha-yellow); }
+
+        .button {
+            font-family: var(--font-display);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            border-radius: 0;
+            clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+        }
+        .button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--mecha-yellow); }
+        .button-primary:hover { box-shadow: 0 0 18px var(--accent-ring); }
+
+        /* ---------------- Panel HUD ---------------- */
+        .summary-card, .card, .talent-card, .table-wrapper, .modal-content, .alert-item {
+            border-radius: 0;
+            background-image:
+                linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent)),
+                linear-gradient(var(--accent), var(--accent)), linear-gradient(var(--accent), var(--accent));
+            background-repeat: no-repeat;
+            background-size: 14px 2px, 2px 14px, 14px 2px, 2px 14px;
+            background-position: right 0 top 0, right 0 top 0, left 0 bottom 0, left 0 bottom 0;
+        }
+        .summary-card { transition: transform var(--motion-normal) var(--ease-block), box-shadow var(--motion-normal); }
+        .summary-card:hover, .talent-card:hover { transform: translateY(-2px); box-shadow: 0 10px 28px var(--accent-ring); }
+        .summary-value { font-family: var(--font-display); font-weight: 800; text-shadow: 0 0 16px var(--accent-ring); }
+        .summary-label { font-size: 12px; letter-spacing: .14em; }
+
+        .alert-group-title, .section-title, .modal-title, .form-section-title, .upload-history-title, .cal-month-title {
+            font-family: var(--font-display);
+            font-size: 12px;
+            letter-spacing: .14em;
+            text-transform: uppercase;
+            color: var(--accent);
+        }
+        .talent-card-name { font-family: var(--font-display); letter-spacing: .04em; }
+        th { font-family: var(--font-display); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+        .empty-state-title { font-family: var(--font-display); font-size: 16px; letter-spacing: .08em; }
+        .empty-state-icon { font-family: var(--font-display); font-size: 28px; }
+        .cal-chip { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
+
+        /* ---------------- Masuk bertahap (boot) ---------------- */
+        .boot .hangar-copy, .boot .hangar-view, .boot .tabs, .boot .tab-content.active > * {
+            animation: bootIn 520ms var(--ease-block) both;
+        }
+        .boot .hangar-view { animation-delay: 120ms; }
+        .boot .tabs { animation-delay: 200ms; }
+        .boot .tab-content.active > * { animation-delay: 280ms; }
+
+        @keyframes bootIn { from { opacity: 0; transform: translateY(12px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+        @keyframes scanSweep { from { top: -60px; } to { top: 100%; } }
+        @keyframes ringSpin { to { transform: rotate(360deg); } }
+        @keyframes hudBlink { 50% { opacity: .25; } }
+
+        @media (max-width: 900px) {
+            .header.hangar { grid-template-columns: 1fr; }
+            .hangar-view { min-height: 300px; }
+            .hangar-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 768px) {
+            .tab-button { font-size: 10px; }
+            .header.hangar h1 { font-size: 28px; }
+            .hangar-controls { bottom: 26px; }
+            .hangar-credit { left: 12px; right: auto; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .hangar-scan::after, .hangar-poster-ring, .hud-dot { animation: none; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Pantau Talent</h1>
-            <p class="header-subtitle">Command center untuk kontrak, kuota, dan jadwal konten.</p>
-            <div class="sync-pill" id="syncPill" role="status" aria-live="polite" hidden></div>
-            <svg class="pixel-astronaut" viewBox="0 0 16 20" shape-rendering="crispEdges"
-                 role="img" aria-label="Maskot astronot piksel">
-                <!-- backpack -->
-                <rect x="3" y="9" width="1" height="5" fill="var(--txt-muted)"/>
-                <rect x="12" y="9" width="1" height="5" fill="var(--txt-muted)"/>
-                <!-- helmet -->
-                <rect x="4" y="1" width="8" height="7" fill="var(--txt)"/>
-                <!-- visor -->
-                <rect x="5" y="3" width="6" height="3" fill="var(--bg)"/>
-                <rect x="6" y="3" width="2" height="1" fill="var(--accent)"/>
-                <!-- neck -->
-                <rect x="6" y="8" width="4" height="1" fill="var(--txt-muted)"/>
-                <!-- torso -->
-                <rect x="4" y="9" width="8" height="6" fill="var(--txt)"/>
-                <rect x="6" y="10" width="4" height="3" fill="var(--bg)"/>
-                <rect x="7" y="11" width="1" height="1" fill="var(--ok)"/>
-                <rect x="8" y="11" width="1" height="1" fill="var(--warn)"/>
-                <!-- arms -->
-                <rect x="2" y="9" width="2" height="5" fill="var(--txt-muted)"/>
-                <rect x="12" y="9" width="2" height="5" fill="var(--txt-muted)"/>
-                <rect x="2" y="14" width="2" height="1" fill="var(--accent)"/>
-                <rect x="12" y="14" width="2" height="1" fill="var(--accent)"/>
-                <!-- legs + boots -->
-                <rect x="4" y="15" width="3" height="4" fill="var(--txt-muted)"/>
-                <rect x="9" y="15" width="3" height="4" fill="var(--txt-muted)"/>
-                <rect x="4" y="18" width="3" height="1" fill="var(--accent)"/>
-                <rect x="9" y="18" width="3" height="1" fill="var(--accent)"/>
-            </svg>
-        </div>
+        <header class="header hangar">
+            <div class="hangar-copy">
+                <div class="hangar-kicker"><span class="hud-dot"></span>KOL OPS // HANGAR-01</div>
+                <h1>Pantau Talent</h1>
+                <p class="header-subtitle">Command center untuk kontrak, kuota, dan jadwal konten.</p>
+                <div class="sync-pill" id="syncPill" role="status" aria-live="polite" hidden></div>
+                <div class="hangar-stats" id="hangarStats" aria-label="Status singkat"></div>
+            </div>
+
+            <!-- Viewport 3D. Model dimuat dari Sketchfab Viewer resmi (embed),
+                 hanya setelah halaman siap, dan bisa dimatikan. -->
+            <div class="hangar-view" id="hangarView">
+                <div class="hud-corner tl"></div><div class="hud-corner tr"></div>
+                <div class="hud-corner bl"></div><div class="hud-corner br"></div>
+                <div class="hangar-scan" aria-hidden="true"></div>
+                <div class="hangar-stage" id="hangarStage">
+                    <div class="hangar-poster" id="hangarPoster">
+                        <div class="hangar-poster-ring" aria-hidden="true"></div>
+                        <div class="hangar-poster-text">XC10 · AETHEL</div>
+                        <button type="button" class="button button-primary" id="hangarLoadBtn">▶ Aktifkan Mecha 3D</button>
+                    </div>
+                </div>
+                <div class="hangar-hud-top" aria-hidden="true">
+                    <span>UNIT XC10-AETHEL</span><span id="hangarState">STANDBY</span>
+                </div>
+                <div class="hangar-controls" id="hangarControls" hidden>
+                    <div class="hangar-modes" id="hangarModes" role="group" aria-label="Mode animasi mecha"></div>
+                    <div class="hangar-toggles">
+                        <button type="button" class="hangar-chip" id="hangarFollowBtn" aria-pressed="true">⇄ Ikut tab</button>
+                        <button type="button" class="hangar-chip" id="hangarHideBtn">✕ Matikan 3D</button>
+                    </div>
+                </div>
+                <a class="hangar-credit" href="https://sketchfab.com/3d-models/xc10-aethel-i-3-modes-i-pbr-lowpoly-i-rigged-18ab2d10ddc74379a272bf59ee65f430"
+                   target="_blank" rel="noopener">Model: XC10-Aethel oleh Cassana XR · Sketchfab</a>
+            </div>
+        </header>
 
         <div class="tabs" role="tablist" aria-label="Menu utama">
             <button class="tab-button active" data-tab="today" role="tab" aria-selected="true" aria-controls="today">Hari Ini</button>
@@ -5281,6 +5533,185 @@
         })();
 
         // ============================================================================
+        // HANGAR MECHA 3D
+        // ============================================================================
+        //
+        // Model XC10-Aethel (Cassana XR) ditampilkan lewat Sketchfab Viewer
+        // resmi — embed, bukan salinan berkas modelnya. Pustaka viewer dan
+        // modelnya baru dimuat setelah halaman siap, agar data kontrak tampil
+        // lebih dulu. Di HP, atau bila "kurangi gerakan" aktif, model menunggu
+        // tombol "Aktifkan". Pilihan "Matikan 3D" diingat di browser ini.
+
+        const MECHA_UID = '18ab2d10ddc74379a272bf59ee65f430';
+        const MECHA_PREF = 'pantau-talent-mecha';
+        let mechaApi = null;
+        let mechaAnim = [];
+        let mechaIdx = 0;
+        let mechaIkutTab = true;
+
+        function prefMecha() {
+            try { return localStorage.getItem(MECHA_PREF) || ''; } catch (e) { return ''; }
+        }
+
+        function aturPrefMecha(v) {
+            try { localStorage.setItem(MECHA_PREF, v); } catch (e) { /* abaikan */ }
+        }
+
+        function statusMecha(teks, online) {
+            const el = document.getElementById('hangarState');
+            if (!el) return;
+            el.textContent = teks;
+            el.classList.toggle('online', !!online);
+        }
+
+        function muatPustakaSketchfab() {
+            if (window.Sketchfab) return Promise.resolve();
+            return new Promise((ok, gagal) => {
+                const s = document.createElement('script');
+                s.src = 'https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js';
+                s.onload = ok;
+                s.onerror = gagal;
+                document.head.appendChild(s);
+            });
+        }
+
+        function pilihAnimasi(i) {
+            if (!mechaApi || !mechaAnim.length) return;
+            mechaIdx = ((i % mechaAnim.length) + mechaAnim.length) % mechaAnim.length;
+            mechaApi.setCurrentAnimationByUID(mechaAnim[mechaIdx][0]);
+            mechaApi.play();
+            document.querySelectorAll('[data-mecha-anim]').forEach(b => {
+                b.classList.toggle('active', Number(b.dataset.mechaAnim) === mechaIdx);
+            });
+            statusMecha('MODE ' + (mechaIdx + 1) + ' · ' + String(mechaAnim[mechaIdx][1] || '').toUpperCase().slice(0, 18), true);
+        }
+
+        async function aktifkanMecha() {
+            const stage = document.getElementById('hangarStage');
+            if (stage.querySelector('iframe')) return;
+            statusMecha('MENYALAKAN…');
+            const iframe = document.createElement('iframe');
+            iframe.title = 'Model 3D XC10-Aethel';
+            iframe.allow = 'autoplay; fullscreen; xr-spatial-tracking';
+            iframe.setAttribute('allowfullscreen', '');
+            stage.appendChild(iframe);
+            try {
+                await muatPustakaSketchfab();
+            } catch (e) {
+                iframe.remove();
+                statusMecha('GAGAL MEMUAT');
+                return;
+            }
+            const client = new window.Sketchfab(iframe);
+            client.init(MECHA_UID, {
+                autostart: 1, preload: 1, transparent: 1, autospin: 0.25, dnt: 1,
+                ui_infos: 0, ui_controls: 0, ui_stop: 0, ui_inspector: 0, ui_settings: 0, ui_help: 0,
+                ui_vr: 0, ui_ar: 0, ui_fullscreen: 0, ui_annotations: 0, ui_hint: 0, ui_loading: 0,
+                ui_theme: 'dark',
+                success(api) {
+                    mechaApi = api;
+                    api.start();
+                    api.addEventListener('viewerready', () => {
+                        iframe.classList.add('ready');
+                        document.getElementById('hangarPoster').hidden = true;
+                        document.getElementById('hangarControls').hidden = false;
+                        statusMecha('ONLINE', true);
+                        api.getAnimations((err, list) => {
+                            mechaAnim = err ? [] : (list || []);
+                            const wadah = document.getElementById('hangarModes');
+                            wadah.innerHTML = mechaAnim.map((a, i) =>
+                                `<button type="button" class="hangar-chip" data-mecha-anim="${i}" title="${escapeHtml(a[1] || '')}">Mode ${i + 1}</button>`).join('');
+                            if (mechaAnim.length) {
+                                api.setCycleMode('loopOne');
+                                pilihAnimasi(0);
+                            }
+                        });
+                    });
+                },
+                error() {
+                    statusMecha('GAGAL MEMUAT');
+                    iframe.remove();
+                }
+            });
+        }
+
+        function matikanMecha() {
+            const stage = document.getElementById('hangarStage');
+            const iframe = stage.querySelector('iframe');
+            if (iframe) iframe.remove();
+            mechaApi = null;
+            mechaAnim = [];
+            document.getElementById('hangarPoster').hidden = false;
+            document.getElementById('hangarControls').hidden = true;
+            document.querySelector('.header.hangar').classList.add('mati');
+            aturPrefMecha('mati');
+        }
+
+        // Angka singkat di hangar: talent aktif, tayang bulan ini, perlu perhatian.
+        function renderHangarStats() {
+            const el = document.getElementById('hangarStats');
+            if (!el) return;
+            const bulan = todayIso().slice(0, 7);
+            const aktif = state.talents.filter(t => daysUntil(t.endDate) >= 0).length;
+            const tayang = state.uploads.filter(u => (u.date || '').slice(0, 7) === bulan).length;
+            const perlu = state.talents.filter(t => metricsFor(t).behind > 0).length;
+            el.innerHTML =
+                `<div class="hangar-stat"><b>${aktif}</b><span>Talent aktif</span></div>` +
+                `<div class="hangar-stat"><b>${tayang}</b><span>Tayang bln ini</span></div>` +
+                `<div class="hangar-stat${perlu ? ' alert' : ''}"><b>${perlu}</b><span>Perlu dicek</span></div>`;
+        }
+
+        document.getElementById('hangarLoadBtn').addEventListener('click', () => {
+            aturPrefMecha('');
+            document.querySelector('.header.hangar').classList.remove('mati');
+            aktifkanMecha();
+        });
+        document.getElementById('hangarHideBtn').addEventListener('click', matikanMecha);
+        document.getElementById('hangarModes').addEventListener('click', e => {
+            const b = e.target.closest('[data-mecha-anim]');
+            if (b) pilihAnimasi(Number(b.dataset.mechaAnim));
+        });
+        document.getElementById('hangarFollowBtn').addEventListener('click', e => {
+            mechaIkutTab = e.currentTarget.getAttribute('aria-pressed') !== 'true';
+            e.currentTarget.setAttribute('aria-pressed', mechaIkutTab ? 'true' : 'false');
+        });
+
+        // Pindah tab = mecha berganti mode, bila "Ikut tab" aktif.
+        document.querySelectorAll('.tab-button').forEach((btn, i) => {
+            btn.addEventListener('click', () => { if (mechaIkutTab && mechaApi) pilihAnimasi(i); });
+        });
+
+        // Latar bergerak halus mengikuti kursor (bukan di layar sentuh).
+        let gerakJadwal = false;
+        window.addEventListener('pointermove', e => {
+            if (e.pointerType !== 'mouse' || gerakJadwal) return;
+            gerakJadwal = true;
+            window.requestAnimationFrame(() => {
+                gerakJadwal = false;
+                document.body.style.setProperty('--mx', ((e.clientX / window.innerWidth) - 0.5).toFixed(3));
+                document.body.style.setProperty('--my', ((e.clientY / window.innerHeight) - 0.5).toFixed(3));
+            });
+        }, { passive: true });
+
+        (function siapkanHangar() {
+            const kurangiGerak = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const layarKecil = typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
+            if (!kurangiGerak) {
+                document.body.classList.add('boot');
+                window.setTimeout(() => document.body.classList.remove('boot'), 1200);
+            }
+            if (prefMecha() === 'mati') {
+                document.querySelector('.header.hangar').classList.add('mati');
+                return;
+            }
+            // Desktop tanpa "kurangi gerakan": nyalakan otomatis setelah halaman siap.
+            if (!kurangiGerak && !layarKecil && navigator.userAgent.indexOf('jsdom') === -1) {
+                if (document.readyState === 'complete') window.setTimeout(aktifkanMecha, 300);
+                else window.addEventListener('load', () => window.setTimeout(aktifkanMecha, 300), { once: true });
+            }
+        })();
+
+        // ============================================================================
         // RENDER FUNCTION
         // ============================================================================
 
@@ -5291,6 +5722,7 @@
             renderDataTab();
             loadSettings();
             renderBiayaTab();
+            if (typeof renderHangarStats === 'function') renderHangarStats();
         }
 
         // ============================================================================
