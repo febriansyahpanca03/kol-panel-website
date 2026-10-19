@@ -616,6 +616,41 @@
         return { talent: baru };
     }
 
+    /**
+     * Memindahkan tanggal jadwal satu per satu. Jadwal yang dihasilkan
+     * otomatis "dibekukan" jadi daftar tanggal pilihan (uploadDates) dengan
+     * perubahan diterapkan, sehingga yang tidak diubah tetap di tempatnya.
+     * Slot yang sudah terisi upload tidak boleh dipindah.
+     *
+     * `changes` = [{ from, to }]; `uploads` = upload kontrak berjalan.
+     */
+    function rescheduleSlots(talent, uploads, changes, today, nowIso) {
+        const m = talentMetrics(talent, uploads, today);
+        const dates = m.slots.map(s => s.date);
+        const dipakai = new Set();
+        const log = [];
+        for (const ch of changes) {
+            if (!ch || !ch.to || ch.to === ch.from) continue;
+            const idx = m.slots.findIndex((s, i) => s.date === ch.from && !dipakai.has(i));
+            if (idx === -1) return { error: 'Jadwal ' + ch.from + ' tidak ditemukan.' };
+            if (m.slots[idx].status === 'done') return { error: 'Jadwal ' + ch.from + ' sudah terisi upload, tidak bisa dipindah.' };
+            if (parseIso(ch.to) === null || ch.to < talent.startDate || ch.to > talent.endDate) {
+                return { error: 'Tanggal ' + ch.to + ' di luar periode kontrak (' + talent.startDate + ' s/d ' + talent.endDate + ').' };
+            }
+            dipakai.add(idx);
+            dates[idx] = ch.to;
+            log.push({ at: nowIso, field: 'jadwal', label: 'Pindah jadwal', from: ch.from, to: ch.to });
+        }
+        if (!log.length) return { talent, moved: 0 };
+
+        const baru = Object.assign({}, talent, { uploadDates: dates.slice().sort() });
+        delete baru.pinnedSlots;
+        delete baru.pinnedFrom;
+        baru.changeLog = (talent.changeLog || []).concat(log);
+        if ((talent.letters || []).length) baru.letterStale = true;
+        return { talent: baru, moved: log.length };
+    }
+
     // ------------------------------------------------------------------------
     // Biaya & performa
     // ------------------------------------------------------------------------
@@ -877,7 +912,7 @@
     }
 
     root.PantauCore = {
-        contractsOf, contractForDate, uploadsForContract, currentUploads, outsideContractUploads, renewContract,
+        contractsOf, contractForDate, uploadsForContract, currentUploads, outsideContractUploads, renewContract, rescheduleSlots,
         numOrNull, median, monthOf, pricePerContent, monthlyLedger, paymentSchedule, costMetrics, priceVerdict,
         parseTanggalSheet, rowsFromKolCsv, planKolImport, applyKolImport,
         parseIso, addDays, daysBetween, uploadDaysOf, buildSchedule, talentMetrics,

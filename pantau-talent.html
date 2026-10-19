@@ -1556,7 +1556,20 @@
         .mode-lihat #importBtn, .mode-lihat #csvNotionBtn, .mode-lihat #syncNotionBtn, .mode-lihat #csvKolBtn,
         .mode-lihat #cleanDuplicatesBtn, .mode-lihat #calcSaveBtn, .mode-lihat [data-hapus-analitik],
         .mode-lihat [data-contract-pdf], .mode-lihat [data-letter-version],
-        .mode-lihat [data-renew-talent], .mode-lihat [data-arsip-letter] { display: none !important; }
+        .mode-lihat [data-renew-talent], .mode-lihat [data-arsip-letter],
+        .mode-lihat [data-edit-jadwal], .mode-lihat #calDetailEditJadwalBtn { display: none !important; }
+
+        /* ---------------- Edit jadwal ---------------- */
+        .jadwal-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-bottom: var(--spacing-md); }
+        .jadwal-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: var(--spacing-md); padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+        .jadwal-row.is-focus { border-color: var(--accent); background-color: var(--accent-wash); }
+        .jadwal-no { font-family: var(--font-mono); font-size: 12px; color: var(--txt-muted); text-align: right; }
+        .jadwal-date { padding: 6px 0; }
+        .jadwal-status { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 8px; border-radius: var(--radius-sm); white-space: nowrap; }
+        .jadwal-status.done { color: var(--ok); background-color: var(--ok-bg); }
+        .jadwal-status.pending { color: var(--warn); background-color: var(--warn-bg); }
+        .jadwal-status.today { color: var(--info); background-color: var(--info-bg); }
+        .jadwal-status.future { color: var(--txt-muted); background-color: var(--surface-2); }
 
         .talent-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
         .talent-card-platform.is-missing { color: var(--warn); background-color: var(--warn-bg); }
@@ -2139,6 +2152,25 @@
         </div>
     </div>
 
+    <!-- MODAL: Edit jadwal per slot -->
+    <div id="jadwalModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" aria-label="Tutup">&times;</button>
+            <div class="modal-title">Edit Jadwal</div>
+            <div class="field">
+                <div class="field-label">Talent</div>
+                <div class="field-value" id="jadwalModalTalent"></div>
+            </div>
+            <p class="form-section-note">Ubah tanggal jadwal yang ingin digeser. Jadwal yang sudah terisi upload terkunci. Setelah digeser, jadwal kontrak ini memakai tanggal pilihan (bisa diatur lagi di Edit Kontrak).</p>
+            <div class="jadwal-list" id="jadwalList"></div>
+            <div class="field-error" id="jadwalError" aria-live="polite"></div>
+            <div class="button-group">
+                <button type="button" class="button button-primary" id="jadwalSaveBtn">Simpan Jadwal</button>
+                <button type="button" class="button button-secondary" id="jadwalCancelBtn">Batal</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL: Pencatat Upload Cepat -->
     <div id="recordUploadModal" class="modal">
         <div class="modal-content">
@@ -2219,6 +2251,7 @@
             </div>
             <div class="button-group">
                 <button type="button" class="button button-primary" id="calDetailConfirmBtn">Sahkan tayang</button>
+                <button type="button" class="button button-secondary" id="calDetailEditJadwalBtn">Geser jadwal</button>
                 <button type="button" class="button button-secondary" id="calDetailUndoBtn">Batalkan konfirmasi</button>
                 <button type="button" class="button button-secondary" id="calDetailCloseBtn">Tutup</button>
             </div>
@@ -2816,6 +2849,7 @@
                             <div class="talent-card-actions">
                                 <button class="button button-primary" data-edit-talent="${talent.id}">✎ Edit Kontrak</button>
                                 <button class="button button-primary" data-quick-record-from-card="${talent.id}">+ Catat Upload</button>
+                                <button class="button button-secondary" data-edit-jadwal="${talent.id}">📅 Edit Jadwal</button>
                                 <button class="button button-secondary" data-renew-talent="${talent.id}">🔁 Perpanjang Kontrak</button>
                                 <button class="button button-secondary" data-contract-pdf="${talent.id}">📄 ${letterButtonLabel(talent)}</button>
                                 <button class="button button-danger" data-delete-talent="${talent.id}">🗑 Hapus</button>
@@ -3817,6 +3851,7 @@
             // Hanya tindakan yang masuk akal untuk keadaan ini yang ditampilkan.
             document.getElementById('calDetailConfirmBtn').style.display = ada ? 'none' : '';
             document.getElementById('calDetailUndoBtn').style.display = ada ? '' : 'none';
+            document.getElementById('calDetailEditJadwalBtn').style.display = ada ? 'none' : '';
 
             document.getElementById('calDetailModal').classList.add('active');
         }
@@ -5039,6 +5074,69 @@
             renderOnlinePanel();
             // Data mode lihat tidak pernah disimpan; kembali ke isi browser ini.
             if (dariLihat) { state = initializeData(); render(); }
+        });
+
+        // ---- Edit jadwal per slot ----------------------------------------
+        // Memindahkan tanggal jadwal satu per satu (mis. talent minta geser
+        // dari Selasa ke Kamis). Slot yang sudah terisi upload dikunci.
+        let jadwalTalentId = null;
+
+        function bukaEditJadwal(talentId, sorot) {
+            const t = state.talents.find(x => x.id === talentId);
+            if (!t) return;
+            jadwalTalentId = talentId;
+            const m = metricsFor(t);
+            const label = { done: 'sudah tayang', pending: 'terlewat', today: 'hari ini', future: 'mendatang' };
+            document.getElementById('jadwalModalTalent').textContent = t.name + ' (@' + t.account + ')';
+            document.getElementById('jadwalError').textContent = '';
+            document.getElementById('jadwalList').innerHTML = m.slots.length ? m.slots.map((s, i) => `
+                <div class="jadwal-row${s.date === sorot ? ' is-focus' : ''}" data-jadwal-row="${i}">
+                    <span class="jadwal-no">${i + 1}</span>
+                    ${s.status === 'done'
+                        ? `<span class="jadwal-date">${formatDate(s.date)}</span>`
+                        : `<input type="date" class="jadwal-input" data-jadwal-from="${s.date}" value="${s.date}" min="${t.startDate}" max="${t.endDate}" aria-label="Tanggal jadwal ${i + 1}">`}
+                    <span class="jadwal-status ${s.status}">${label[s.status]}</span>
+                </div>`).join('')
+                : '<p class="form-section-note">Kontrak ini belum punya jadwal.</p>';
+            document.getElementById('jadwalModal').classList.add('active');
+            const fokus = document.querySelector('#jadwalList .is-focus .jadwal-input');
+            if (fokus) fokus.focus();
+        }
+
+        function tutupEditJadwal() {
+            document.getElementById('jadwalModal').classList.remove('active');
+            jadwalTalentId = null;
+        }
+
+        document.getElementById('jadwalSaveBtn').addEventListener('click', () => {
+            const t = state.talents.find(x => x.id === jadwalTalentId);
+            if (!t) return tutupEditJadwal();
+            const changes = [...document.querySelectorAll('#jadwalList [data-jadwal-from]')]
+                .map(inp => ({ from: inp.dataset.jadwalFrom, to: inp.value }))
+                .filter(c => c.to && c.to !== c.from);
+            if (!changes.length) return tutupEditJadwal();
+            const hasil = PantauCore.rescheduleSlots(t, PantauCore.currentUploads(t, state.uploads), changes, todayIso(), new Date().toISOString());
+            if (hasil.error) { document.getElementById('jadwalError').textContent = hasil.error; return; }
+            state.talents[state.talents.findIndex(x => x.id === t.id)] = hasil.talent;
+            saveData();
+            tutupEditJadwal();
+            render();
+        });
+
+        document.getElementById('jadwalCancelBtn').addEventListener('click', tutupEditJadwal);
+        document.querySelector('#jadwalModal .modal-close').addEventListener('click', tutupEditJadwal);
+        document.getElementById('jadwalModal').addEventListener('click', e => { if (e.target === e.currentTarget) tutupEditJadwal(); });
+
+        document.addEventListener('click', e => {
+            const b = e.target.closest('[data-edit-jadwal]');
+            if (b) bukaEditJadwal(b.dataset.editJadwal);
+        });
+
+        document.getElementById('calDetailEditJadwalBtn').addEventListener('click', () => {
+            if (!calDetailKonteks) return;
+            const { talentId, tanggal } = calDetailKonteks;
+            tutupCalDetail();
+            bukaEditJadwal(talentId, tanggal);
         });
 
         // ============================================================================
