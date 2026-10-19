@@ -38,15 +38,15 @@
 
             /* --- status: arti tetap, jangan dipakai dekoratif --- */
             --warn:   #FFC93C;  /* jadwal belum dikonfirmasi */
-            --danger: #FF7A7A;  /* tertinggal dari target */
-            --ok:     #4ADE80;  /* target tercapai */
-            --info:   #38D5F5;  /* kontrak & kuota */
+            --danger: #FF5C6C;  /* tertinggal dari target — merah mecha */
+            --ok:     #2DD4BF;  /* target tercapai — teal, senada dengan biru */
+            --info:   #A5B4FC;  /* kontrak & kuota — lavender, beda dari aksen */
 
             /* --- isi badge: warna status + 15% alpha --- */
             --warn-bg:   rgba(255, 201, 60, .15);
-            --danger-bg: rgba(255, 122, 122, .15);
-            --ok-bg:     rgba(74, 222, 128, .15);
-            --info-bg:   rgba(56, 213, 245, .15);
+            --danger-bg: rgba(255, 92, 108, .15);
+            --ok-bg:     rgba(45, 212, 191, .15);
+            --info-bg:   rgba(165, 180, 252, .15);
 
             /* --- turunan: bayangan & lapisan, dipakai komponen --- */
             --shadow-raise: 0 2px 0 rgba(2, 5, 12, .9), 0 10px 24px rgba(2, 5, 12, .5);
@@ -1869,6 +1869,10 @@
         .hangar-credit:hover { color: var(--accent); text-decoration: underline; }
         .hangar.mati .hangar-view { min-height: 0; height: 0; border: 0; display: none; }
         .hangar.mati { grid-template-columns: 1fr; }
+        /* Saat 3D dimatikan, viewport (dan tombolnya) tersembunyi; tombol ini
+           satu-satunya jalan menyalakannya lagi. */
+        .hangar-show { display: none; align-self: flex-start; margin-top: 16px; }
+        .hangar.mati .hangar-show { display: inline-block; }
 
         /* ---------------- Tab & tombol bersudut ---------------- */
         .tabs { background-color: var(--surface); border: 1px solid var(--line); border-radius: 0; gap: 6px; padding: 6px; }
@@ -1928,6 +1932,17 @@
         .empty-state-icon { font-family: var(--font-display); font-size: 28px; }
         .cal-chip { font-family: 'Rajdhani', sans-serif; font-size: 12px; font-weight: 700; letter-spacing: .03em; }
 
+        /* ---------------- Chip kalender: kalem, warna di garis kiri ---------------- */
+        .cal-chip { border: 0; border-left: 3px solid transparent; border-radius: 0; color: var(--txt); }
+        .cal-chip.done    { background-color: var(--ok-bg);   border-left-color: var(--ok); color: var(--txt); }
+        .cal-chip.pending { background-color: var(--warn-bg); border-left-color: var(--warn); color: var(--warn); }
+        .cal-chip.future  { background-color: transparent; border: 1px dashed var(--line); border-left: 3px solid var(--txt-muted); color: var(--txt-muted); }
+        .cal-chip:hover   { opacity: 1; filter: brightness(1.25); }
+        .cal-legend i.done    { background-color: var(--ok); }
+        .cal-legend i.pending { background-color: var(--warn); }
+        .cal-legend i.future  { background-color: transparent; border: 1px dashed var(--txt-muted); }
+        .cal-cell.today { box-shadow: inset 0 0 0 2px var(--accent); }
+
         /* ---------------- Masuk bertahap (boot) ---------------- */
         .boot .hangar-copy, .boot .hangar-view, .boot .tabs, .boot .tab-content.active > * {
             animation: bootIn 520ms var(--ease-block) both;
@@ -1966,6 +1981,7 @@
                 <p class="header-subtitle">Command center untuk kontrak, kuota, dan jadwal konten.</p>
                 <div class="sync-pill" id="syncPill" role="status" aria-live="polite" hidden></div>
                 <div class="hangar-stats" id="hangarStats" aria-label="Status singkat"></div>
+                <button type="button" class="hangar-chip hangar-show" id="hangarShowBtn">▶ Tampilkan Mecha 3D</button>
             </div>
 
             <!-- Viewport 3D. Model dimuat dari Sketchfab Viewer resmi (embed),
@@ -5667,6 +5683,11 @@
             aktifkanMecha();
         });
         document.getElementById('hangarHideBtn').addEventListener('click', matikanMecha);
+        document.getElementById('hangarShowBtn').addEventListener('click', () => {
+            aturPrefMecha('');
+            document.querySelector('.header.hangar').classList.remove('mati');
+            aktifkanMecha();
+        });
         document.getElementById('hangarModes').addEventListener('click', e => {
             const b = e.target.closest('[data-mecha-anim]');
             if (b) pilihAnimasi(Number(b.dataset.mechaAnim));
