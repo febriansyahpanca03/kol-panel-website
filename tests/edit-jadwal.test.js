@@ -108,3 +108,33 @@ describe("halaman: Edit Jadwal", () => {
     expect(doc.querySelector("#jadwalList .is-focus [data-jadwal-from]").value).toBe("2026-10-13");
   });
 });
+
+describe("halaman: seret jadwal di kalender", () => {
+  it("hanya chip jadwal (belum terisi) yang bisa diseret; tiap tanggal jadi target", () => {
+    const dom = bukaHalaman();
+    const doc = dom.window.document;
+    expect(doc.querySelector('[data-cal-date="2026-10-06"].cal-chip.done').hasAttribute("data-cal-drag")).toBe(false);
+    expect(doc.querySelector('[data-cal-talent="t1"][data-cal-date="2026-10-13"]').dataset.calDrag).toBe("1");
+    expect(doc.querySelector('[data-cal-cell="2026-10-15"]')).not.toBeNull();
+  });
+
+  it("menjatuhkan ke tanggal lain langsung tersimpan, dan bisa diurungkan", () => {
+    const dom = bukaHalaman();
+    const doc = dom.window.document;
+    expect(dom.window.geserJadwal("t1", "2026-10-13", "2026-10-16")).toBe(true);
+    expect(simpanan(dom).talents[0].uploadDates).toEqual(["2026-10-06", "2026-10-16", "2026-10-20"]);
+    expect(doc.querySelector('[data-cal-talent="t1"][data-cal-date="2026-10-16"]')).not.toBeNull();
+    expect(doc.getElementById("toast").textContent).toMatch(/13 Okt 2026 → 16 Okt 2026/);
+
+    doc.getElementById("toastAction").click();
+    expect(simpanan(dom).talents[0].uploadDates).toBeUndefined();
+    expect(doc.querySelector('[data-cal-talent="t1"][data-cal-date="2026-10-13"]')).not.toBeNull();
+  });
+
+  it("menjatuhkan di luar periode → pesan, tidak tersimpan", () => {
+    const dom = bukaHalaman();
+    expect(dom.window.geserJadwal("t1", "2026-10-20", "2026-11-02")).toBe(false);
+    expect(dom.window.document.getElementById("toast").textContent).toMatch(/di luar periode/);
+    expect(simpanan(dom).talents[0].uploadDates).toBeUndefined();
+  });
+});

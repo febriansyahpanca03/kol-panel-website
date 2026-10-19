@@ -1559,6 +1559,23 @@
         .mode-lihat [data-renew-talent], .mode-lihat [data-arsip-letter],
         .mode-lihat [data-edit-jadwal], .mode-lihat #calDetailEditJadwalBtn { display: none !important; }
 
+        /* ---------------- Seret jadwal di kalender ---------------- */
+        .cal-chip[data-cal-drag] { cursor: grab; touch-action: none; }
+        .cal-chip.is-dragging { opacity: .35; }
+        .cal-chip-ghost {
+            position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none;
+            box-shadow: 0 6px 18px rgba(0,0,0,.45); opacity: .95;
+        }
+        body.cal-menyeret, body.cal-menyeret * { cursor: grabbing !important; user-select: none; }
+        .cal-cell.drop-target { outline: 2px dashed var(--accent); outline-offset: -3px; background-color: var(--accent-wash); }
+        .cal-legend-hint { color: var(--txt-muted); }
+        .toast {
+            position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 3000;
+            display: flex; align-items: center; gap: var(--spacing-md); max-width: calc(100vw - 32px);
+            padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-md);
+            background-color: var(--surface); color: var(--txt); box-shadow: 0 8px 24px rgba(0,0,0,.4); font-size: 14px;
+        }
+
         /* ---------------- Edit jadwal ---------------- */
         .jadwal-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin-bottom: var(--spacing-md); }
         .jadwal-row { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: var(--spacing-md); padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); }
@@ -1771,6 +1788,7 @@
                 <span><i class="done"></i>sudah tayang</span>
                 <span><i class="pending"></i>jadwal terlewat, klik untuk sahkan</span>
                 <span><i class="future"></i>jadwal mendatang</span>
+                <span class="cal-legend-hint">Seret jadwal ke tanggal lain untuk menggeser (layar sentuh: tahan dulu, lalu seret)</span>
             </div>
             <div id="kalenderContainer"></div>
         </div>
@@ -2151,6 +2169,8 @@
             </div>
         </div>
     </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
     <!-- MODAL: Edit jadwal per slot -->
     <div id="jadwalModal" class="modal">
@@ -3728,15 +3748,18 @@
                 const iso = kunciBulan(b) + '-' + String(tgl).padStart(2, '0');
                 const items = (byDate[iso] || []).sort((x, y) => urut[x.status] - urut[y.status]);
 
-                html += '<div class="cal-cell' + (iso === hari ? ' today' : '') + '">';
+                html += '<div class="cal-cell' + (iso === hari ? ' today' : '') + '" data-cal-cell="' + iso + '">';
                 html += '<div class="cal-date">' + tgl + '</div>';
                 items.forEach(it => {
                     const ket = it.status === 'done' ? 'sudah tayang'
                         : it.status === 'pending' ? 'jadwal terlewat'
                         : 'jadwal mendatang';
+                    const bisaSeret = it.status !== 'done' && !modeLihat();
                     html += '<button type="button" class="cal-chip ' + it.status +
-                        '" data-cal-talent="' + it.t.id + '" data-cal-date="' + iso +
-                        '" title="' + it.t.account + ' - ' + ket + ', klik untuk lihat detail">' + it.t.account + '</button>';
+                        '" data-cal-talent="' + it.t.id + '" data-cal-date="' + iso + '"' +
+                        (bisaSeret ? ' data-cal-drag="1"' : '') +
+                        ' title="' + it.t.account + ' - ' + ket + ', klik untuk lihat detail' +
+                        (bisaSeret ? ', seret ke tanggal lain untuk menggeser' : '') + '">' + it.t.account + '</button>';
                 });
                 html += '</div>';
             }
@@ -5138,6 +5161,124 @@
             tutupCalDetail();
             bukaEditJadwal(talentId, tanggal);
         });
+
+        // ---- Seret jadwal di kalender ------------------------------------
+        // Chip jadwal (terlewat/mendatang) bisa diseret ke tanggal lain dan
+        // langsung tersimpan. Mouse: mulai menyeret setelah bergeser 6px, jadi
+        // klik biasa tetap membuka detail. Sentuh: tahan ±0,35 detik dulu,
+        // supaya menggeser layar tidak tertukar dengan menyeret jadwal.
+        let seretUndo = null;
+        let toastTimer = null;
+
+        function toast(pesan, aksi) {
+            const el = document.getElementById('toast');
+            el.innerHTML = '<span>' + escapeHtml(pesan) + '</span>' + (aksi ? '<button type="button" class="button button-small button-secondary" id="toastAction">' + aksi.label + '</button>' : '');
+            el.hidden = false;
+            if (aksi) document.getElementById('toastAction').addEventListener('click', () => { aksi.run(); el.hidden = true; });
+            window.clearTimeout(toastTimer);
+            toastTimer = window.setTimeout(() => { el.hidden = true; }, 7000);
+        }
+
+        function geserJadwal(talentId, dari, ke) {
+            if (!ke || ke === dari) return false;
+            if (modeLihat()) { toast('Mode lihat saja — jadwal tidak bisa digeser.'); return false; }
+            const idx = state.talents.findIndex(x => x.id === talentId);
+            if (idx === -1) return false;
+            const lama = state.talents[idx];
+            const hasil = PantauCore.rescheduleSlots(lama, PantauCore.currentUploads(lama, state.uploads), [{ from: dari, to: ke }], todayIso(), new Date().toISOString());
+            if (hasil.error) { toast(hasil.error); return false; }
+            state.talents[idx] = hasil.talent;
+            saveData();
+            render();
+            seretUndo = { idx, lama };
+            toast(lama.account + ': jadwal ' + formatDate(dari) + ' → ' + formatDate(ke), {
+                label: 'Urungkan',
+                run: () => {
+                    if (!seretUndo) return;
+                    state.talents[seretUndo.idx] = seretUndo.lama;
+                    seretUndo = null;
+                    saveData();
+                    render();
+                }
+            });
+            return true;
+        }
+
+        (function pasangSeretKalender() {
+            const wadah = document.getElementById('kalenderContainer');
+            let seret = null;      // { chip, talentId, dari, x, y, aktif, hantu, tahan }
+            let abaikanKlik = false;
+
+            function sel(x, y) {
+                const el = document.elementFromPoint && document.elementFromPoint(x, y);
+                return el ? el.closest('[data-cal-cell]') : null;
+            }
+
+            function mulai() {
+                seret.aktif = true;
+                const h = seret.chip.cloneNode(true);
+                h.classList.add('cal-chip-ghost');
+                h.style.width = seret.chip.offsetWidth + 'px';
+                document.body.appendChild(h);
+                seret.hantu = h;
+                seret.chip.classList.add('is-dragging');
+                document.body.classList.add('cal-menyeret');
+            }
+
+            function gerak(x, y) {
+                if (!seret || !seret.aktif) return;
+                seret.hantu.style.transform = 'translate(' + (x + 8) + 'px,' + (y + 8) + 'px)';
+                document.querySelectorAll('.cal-cell.drop-target').forEach(c => c.classList.remove('drop-target'));
+                const c = sel(x, y);
+                if (c) c.classList.add('drop-target');
+            }
+
+            function selesai(x, y) {
+                if (!seret) return;
+                window.clearTimeout(seret.tahan);
+                const s = seret;
+                seret = null;
+                if (!s.aktif) return;
+                s.hantu.remove();
+                s.chip.classList.remove('is-dragging');
+                document.body.classList.remove('cal-menyeret');
+                document.querySelectorAll('.cal-cell.drop-target').forEach(c => c.classList.remove('drop-target'));
+                abaikanKlik = true;
+                window.setTimeout(() => { abaikanKlik = false; }, 50);
+                const c = x === null ? null : sel(x, y);
+                if (c) geserJadwal(s.talentId, s.dari, c.dataset.calCell);
+            }
+
+            wadah.addEventListener('pointerdown', e => {
+                const chip = e.target.closest('[data-cal-drag]');
+                if (!chip || modeLihat() || (e.pointerType === 'mouse' && e.button !== 0)) return;
+                seret = { chip, talentId: chip.dataset.calTalent, dari: chip.dataset.calDate, x: e.clientX, y: e.clientY, aktif: false };
+                if (e.pointerType !== 'mouse') {
+                    seret.tahan = window.setTimeout(() => { if (seret) { mulai(); gerak(seret.x, seret.y); } }, 350);
+                }
+            });
+
+            window.addEventListener('pointermove', e => {
+                if (!seret) return;
+                if (!seret.aktif) {
+                    const jauh = Math.abs(e.clientX - seret.x) + Math.abs(e.clientY - seret.y);
+                    if (e.pointerType === 'mouse' && jauh > 6) mulai();
+                    else if (e.pointerType !== 'mouse' && jauh > 10) { window.clearTimeout(seret.tahan); seret = null; return; }
+                    else return;
+                }
+                e.preventDefault();
+                gerak(e.clientX, e.clientY);
+            }, { passive: false });
+
+            window.addEventListener('pointerup', e => selesai(e.clientX, e.clientY));
+            window.addEventListener('pointercancel', () => selesai(null, null));
+            window.addEventListener('keydown', e => { if (e.key === 'Escape' && seret) selesai(null, null); });
+
+            // Menyeret tidak boleh sekaligus membuka detail jadwal.
+            wadah.addEventListener('click', e => {
+                if (abaikanKlik) { e.stopPropagation(); e.preventDefault(); }
+            }, true);
+        })();
 
         // ============================================================================
         // RENDER FUNCTION
