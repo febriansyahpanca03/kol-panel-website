@@ -212,3 +212,57 @@ describe("formulir tambah talent", () => {
     expect(doc.querySelector('[data-sched-mode="rata"]').classList.contains("active")).toBe(true);
   });
 });
+
+describe("tanggal berakhir otomatis", () => {
+  it("core: jadwal ke-N dari tanggal mulai", () => {
+    expect(C.endDateFor("2026-10-20", 48, "2,4,6")).toBe("2027-02-06");
+    expect(C.endDateFor("2026-10-20", 3, "2")).toBe("2026-11-03");
+    expect(C.endDateFor("2026-10-20", 3, "")).toBeNull();
+  });
+
+  const ev = (dom, el, type) => el.dispatchEvent(new dom.window.Event(type));
+
+  it("terisi sendiri saat kuota, tanggal mulai, dan hari upload diisi", () => {
+    const dom = bukaHalaman();
+    const doc = dom.window.document;
+    doc.getElementById("addTalentBtn").click();
+    doc.getElementById("talentStartDate").value = "2026-10-20";
+    ev(dom, doc.getElementById("talentStartDate"), "change");
+    doc.getElementById("talentQuota").value = "48";
+    ev(dom, doc.getElementById("talentQuota"), "input");
+    ["2", "4", "6"].forEach((d) => doc.querySelector(`[data-day-chip="${d}"]`).click());
+    expect(doc.getElementById("talentEndDate").value).toBe("2027-02-06");
+    expect(doc.getElementById("talentEndHint").textContent).toMatch(/Otomatis: jadwal ke-48/);
+
+    // Kuota berubah → tanggal berakhir ikut berubah.
+    doc.getElementById("talentQuota").value = "3";
+    ev(dom, doc.getElementById("talentQuota"), "input");
+    expect(doc.getElementById("talentEndDate").value).toBe("2026-10-24");
+  });
+
+  it("diketik manual → tidak ditimpa lagi, tapi ada tombol untuk kembali ke otomatis", () => {
+    const dom = bukaHalaman();
+    const doc = dom.window.document;
+    doc.getElementById("addTalentBtn").click();
+    doc.getElementById("talentStartDate").value = "2026-10-20";
+    doc.getElementById("talentQuota").value = "3";
+    doc.querySelector('[data-day-chip="2"]').click();
+    const akhir = doc.getElementById("talentEndDate");
+    akhir.value = "2026-12-31";
+    ev(dom, akhir, "input");
+    doc.getElementById("talentQuota").value = "4";
+    ev(dom, doc.getElementById("talentQuota"), "input");
+    expect(akhir.value).toBe("2026-12-31");
+    doc.getElementById("talentEndUseAuto").click();
+    expect(akhir.value).toBe("2026-11-10");
+  });
+
+  it("membuka Edit Kontrak tidak mengubah tanggal berakhir yang tersimpan", () => {
+    const lama = { id: "t1", name: "A", account: "a", platform: "TikTok", quota: 3, value: 1,
+      startDate: "2026-10-01", endDate: "2026-12-31", uploadDays: "2" };
+    const dom = bukaHalaman([lama]);
+    const doc = dom.window.document;
+    doc.querySelector('[data-edit-talent="t1"]').click();
+    expect(doc.getElementById("talentEndDate").value).toBe("2026-12-31");
+  });
+});

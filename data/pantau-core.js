@@ -1142,8 +1142,24 @@
         return out;
     }
 
+    /**
+     * Tanggal berakhir otomatis: tanggal jadwal ke-`quota` bila upload
+     * dilakukan pada `uploadDays` mulai `startDate`. Null bila data kurang.
+     */
+    function endDateFor(startDate, quota, uploadDays) {
+        const q = parseInt(quota, 10) || 0;
+        const days = uploadDaysOf({ uploadDays });
+        let t = parseIso(startDate);
+        if (!q || !days.length || t === null) return null;
+        let n = 0;
+        for (let i = 0; i < 3660; i++, t += DAY_MS) {
+            if (days.indexOf(new Date(t).getUTCDay()) !== -1 && ++n === q) return isoFromMs(t);
+        }
+        return null;
+    }
+
     root.PantauCore = {
-        backfillUploads, renewalScore, talentEr, BOBOT_SKOR, paymentsOf, dailySummary, salesFromCsv,
+        endDateFor, backfillUploads, renewalScore, talentEr, BOBOT_SKOR, paymentsOf, dailySummary, salesFromCsv,
         contractsOf, contractForDate, uploadsForContract, currentUploads, outsideContractUploads, renewContract, rescheduleSlots,
         numOrNull, median, monthOf, pricePerContent, monthlyLedger, paymentSchedule, costMetrics, priceVerdict,
         parseTanggalSheet, rowsFromKolCsv, planKolImport, applyKolImport,

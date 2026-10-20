@@ -108,7 +108,8 @@ describe("halaman: perpanjang kontrak", () => {
     doc.querySelector('[data-renew-talent="t1"]').click();
     expect(doc.getElementById("talentModalTitle").textContent).toMatch(/Perpanjang Kontrak.*#2/);
     expect(doc.getElementById("talentStartDate").value).toBe("2026-10-01");
-    expect(doc.getElementById("talentEndDate").value).toBe("2026-10-30");
+    // 8 video Senin/Kamis mulai 1 Okt → jadwal ke-8 jatuh 26 Okt.
+    expect(doc.getElementById("talentEndDate").value).toBe("2026-10-26");
     expect(doc.getElementById("talentQuota").value).toBe("8");
     expect(doc.getElementById("talentName").value).toBe("Achmad");
   });

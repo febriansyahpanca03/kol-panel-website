@@ -1996,3 +1996,7 @@ th { font-family: var(--font-display); font-size: 10px; letter-spacing: .12em; t
     .summary-label { font-size: 10px; letter-spacing: .08em; }
     .biaya-toolbar .button { width: 100%; }
 }
+
+/* Tombol bergaya tautan di dalam teks bantuan. */
+.link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.link-button:hover { color: var(--accent-hover); }

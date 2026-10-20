@@ -391,6 +391,7 @@
                     <div class="field">
                         <div class="field-label">Tanggal Berakhir</div>
                         <input type="date" id="talentEndDate" required>
+                        <div class="setting-description" id="talentEndHint" aria-live="polite"></div>
                     </div>
                 </div>
 
@@ -1373,6 +1374,8 @@
             const mulai = PantauCore.addDays(talent.endDate, 1);
             document.getElementById('talentStartDate').value = mulai;
             document.getElementById('talentEndDate').value = PantauCore.addDays(mulai, Math.max(0, durasi));
+            const akhirOtomatis = PantauCore.endDateFor(mulai, talent.quota, talent.uploadDays);
+            if (akhirOtomatis && !PantauCore.uploadDatesOf(talent).length) document.getElementById('talentEndDate').value = akhirOtomatis;
             document.getElementById('talentContractDate').value = '';
             const r = skorTalent(talent);
             if (r.hargaUsulan !== null && r.hargaUsulan < (Number(talent.value) || 0) && r.saran !== 'data-kurang') {
@@ -1606,6 +1609,7 @@
 
             form.reset();
             delete form.dataset.renew;
+            delete form.dataset.endManual;
 
             if (talentId) {
                 const talent = state.talents.find(t => t.id === talentId);
@@ -1836,7 +1840,50 @@
         }
 
         // Menggambar ulang tombol hari, kalender mini, label kuota, dan pratinjau.
+        // ---- Tanggal berakhir otomatis --------------------------------------
+        // Mode "hari tetap tiap minggu": tanggal berakhir = jadwal ke-N (N =
+        // kuota) mulai tanggal mulai. Dihitung ulang setiap kuota, tanggal
+        // mulai, atau hari upload diubah — kecuali tanggal berakhir sudah
+        // diketik manual. Membuka formulir saja tidak pernah mengubahnya.
+        function hitungAkhirOtomatis() {
+            const mode = document.getElementById('talentForm').dataset.schedMode;
+            if (mode !== 'hari') return null;
+            return PantauCore.endDateFor(
+                document.getElementById('talentStartDate').value,
+                document.getElementById('talentQuota').value,
+                document.getElementById('talentUploadDays').value);
+        }
+
+        function terapkanAkhirOtomatis() {
+            const form = document.getElementById('talentForm');
+            const akhir = hitungAkhirOtomatis();
+            if (akhir && form.dataset.endManual !== '1') document.getElementById('talentEndDate').value = akhir;
+        }
+
+        function perbaruiHintAkhir() {
+            const el = document.getElementById('talentEndHint');
+            const akhir = hitungAkhirOtomatis();
+            const kini = document.getElementById('talentEndDate').value;
+            if (!akhir) {
+                el.innerHTML = document.getElementById('talentForm').dataset.schedMode === 'hari'
+                    ? 'Isi tanggal mulai, kuota, dan hari upload untuk menghitung otomatis.'
+                    : 'Isi manual (otomatis hanya untuk mode hari tetap tiap minggu).';
+                return;
+            }
+            const q = document.getElementById('talentQuota').value;
+            el.innerHTML = akhir === kini
+                ? `✓ Otomatis: jadwal ke-${escapeHtml(q)} jatuh ${formatDate(akhir)}`
+                : `Jadwal ke-${escapeHtml(q)} jatuh ${formatDate(akhir)}. <button type="button" class="link-button" id="talentEndUseAuto">Pakai tanggal ini</button>`;
+            const b = document.getElementById('talentEndUseAuto');
+            if (b) b.addEventListener('click', () => {
+                delete document.getElementById('talentForm').dataset.endManual;
+                document.getElementById('talentEndDate').value = akhir;
+                segarkanPilihanJadwal();
+            });
+        }
+
         function segarkanPilihanJadwal() {
+            perbaruiHintAkhir();
             const mode = document.getElementById('talentForm').dataset.schedMode || 'rata';
             const hari = PantauCore.uploadDaysOf({ uploadDays: document.getElementById('talentUploadDays').value });
             document.querySelectorAll('[data-day-chip]').forEach(b => {
@@ -1953,7 +2000,7 @@
         siapkanPilihanKontrak();
 
         document.querySelectorAll('[data-sched-mode]').forEach(b => {
-            b.addEventListener('click', () => aturModeJadwal(b.dataset.schedMode));
+            b.addEventListener('click', () => { aturModeJadwal(b.dataset.schedMode); terapkanAkhirOtomatis(); segarkanPilihanJadwal(); });
         });
 
         document.getElementById('talentDayChips').addEventListener('click', e => {
@@ -1963,6 +2010,7 @@
             const d = Number(b.dataset.dayChip);
             if (hari.has(d)) hari.delete(d); else hari.add(d);
             document.getElementById('talentUploadDays').value = [...hari].sort((a, c) => a - c).join(',');
+            terapkanAkhirOtomatis();
             segarkanPilihanJadwal();
         });
 
@@ -1988,6 +2036,15 @@
             const sudahSemua = semua.length && semua.every(x => set.has(x));
             semua.forEach(x => { if (sudahSemua) set.delete(x); else set.add(x); });
             simpanTanggal(set);
+        });
+
+        ['talentQuota', 'talentStartDate'].forEach(id => {
+            document.getElementById(id).addEventListener('input', terapkanAkhirOtomatis);
+            document.getElementById(id).addEventListener('change', terapkanAkhirOtomatis);
+        });
+        // Mengetik tanggal berakhir sendiri = berhenti mengisi otomatis.
+        document.getElementById('talentEndDate').addEventListener('input', () => {
+            document.getElementById('talentForm').dataset.endManual = '1';
         });
 
         ['talentQuota', 'talentStartDate', 'talentEndDate', 'talentContentType'].forEach(id => {
